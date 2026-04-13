@@ -15,11 +15,13 @@ try:
 except ImportError:
     ARRAY = None
 
-# Only import geoalchemy2 if not in test mode and using PostgreSQL
+# Only import geoalchemy2 if available and not in test mode
+Geometry = None
 if os.getenv("TESTING", "false").lower() != "true":
-    from geoalchemy2 import Geometry
-else:
-    Geometry = None
+    try:
+        from geoalchemy2 import Geometry
+    except ImportError:
+        Geometry = None
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@db:5432/marketplace_db")
 
