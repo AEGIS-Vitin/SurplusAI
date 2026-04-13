@@ -199,12 +199,12 @@ def create_generador(
         raise HTTPException(status_code=400, detail="CIF ya registrado")
 
     try:
-        # For testing, store location as string if geoalchemy2 not available
-        if os.getenv("TESTING", "false").lower() == "true":
-            ubicacion = f"POINT({generador.ubicacion_lon} {generador.ubicacion_lat})"
-        else:
+        # Store location - use PostGIS if available, plain text otherwise
+        try:
             from geoalchemy2 import func as gf
             ubicacion = gf.ST_GeomFromText(f"POINT({generador.ubicacion_lon} {generador.ubicacion_lat})", 4326)
+        except ImportError:
+            ubicacion = f"POINT({generador.ubicacion_lon} {generador.ubicacion_lat})"
 
         db_generador = database.GeneradorDB(
             nombre=generador.nombre.strip(),
@@ -274,12 +274,12 @@ def create_receptor(
         raise HTTPException(status_code=400, detail="CIF ya registrado")
 
     try:
-        # For testing, store location as string if geoalchemy2 not available
-        if os.getenv("TESTING", "false").lower() == "true":
-            ubicacion = f"POINT({receptor.ubicacion_lon} {receptor.ubicacion_lat})"
-        else:
+        # Store location - use PostGIS if available, plain text otherwise
+        try:
             from geoalchemy2 import func as gf
             ubicacion = gf.ST_GeomFromText(f"POINT({receptor.ubicacion_lon} {receptor.ubicacion_lat})", 4326)
+        except ImportError:
+            ubicacion = f"POINT({receptor.ubicacion_lon} {receptor.ubicacion_lat})"
 
         db_receptor = database.ReceptorDB(
             nombre=receptor.nombre.strip(),
@@ -371,12 +371,12 @@ def create_lot(
     )
 
     try:
-        # For testing, store location as string if geoalchemy2 not available
-        if os.getenv("TESTING", "false").lower() == "true":
-            ubicacion = f"POINT({lote.ubicacion_lon} {lote.ubicacion_lat})"
-        else:
+        # Store location - use PostGIS if available, plain text otherwise
+        try:
             from geoalchemy2 import func as gf
             ubicacion = gf.ST_GeomFromText(f"POINT({lote.ubicacion_lon} {lote.ubicacion_lat})", 4326)
+        except ImportError:
+            ubicacion = f"POINT({lote.ubicacion_lon} {lote.ubicacion_lat})"
 
         db_lote = database.LoteDB(
             generador_id=lote.generador_id,
@@ -430,7 +430,7 @@ def list_lots(
     lotes = query.all()
 
     # Filter by location if provided
-    if ubicacion_lat and ubicacion_lon and os.getenv("TESTING", "false").lower() != "true":
+    if ubicacion_lat and ubicacion_lon:
         try:
             from geoalchemy2 import func as gf
             filtered_lotes = []
