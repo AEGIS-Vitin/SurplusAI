@@ -48,14 +48,10 @@ RUN chown -R appuser:appuser /app
 # Switch to non-root user
 USER appuser
 
-# Health check - improved with timeout
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
-
-# Expose port
+# Expose port (Railway sets $PORT dynamically)
 EXPOSE 8000
 
-# Run with gunicorn for production
-CMD ["gunicorn", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", \
-     "--bind", "0.0.0.0:8000", "--timeout", "120", "--access-logfile", "-", \
-     "--error-logfile", "-", "main:app"]
+# Run with gunicorn — Railway injects $PORT
+CMD gunicorn -w 4 -k uvicorn.workers.UvicornWorker \
+    --bind "0.0.0.0:${PORT:-8000}" --timeout 120 \
+    --access-logfile - --error-logfile - main:app
