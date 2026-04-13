@@ -74,7 +74,8 @@ def extract_token(authorization: Optional[str] = Header(None)) -> Optional[str]:
 def health_check(db: Session = Depends(get_db)):
     """Health check endpoint - public"""
     try:
-        db.execute("SELECT 1")
+        from sqlalchemy import text
+        db.execute(text("SELECT 1"))
         db_status = "healthy"
         overall_status = "healthy"
     except Exception as e:
