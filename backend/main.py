@@ -169,6 +169,86 @@ def get_current_user_info(
     return user
 
 
+# ==================== HELPERS ====================
+
+def parse_ubicacion(ubicacion) -> tuple:
+    """Parse location from DB (POINT string or WKBElement) to (lat, lon)"""
+    if ubicacion is None:
+        return 0.0, 0.0
+    if isinstance(ubicacion, str):
+        # "POINT(lon lat)" format
+        try:
+            coords = ubicacion.replace("POINT(", "").replace(")", "").strip().split()
+            return float(coords[1]), float(coords[0])
+        except (IndexError, ValueError):
+            return 0.0, 0.0
+    # GeoAlchemy2 WKBElement - try to extract coords
+    try:
+        from geoalchemy2.shape import to_shape
+        point = to_shape(ubicacion)
+        return point.y, point.x
+    except Exception:
+        return 0.0, 0.0
+
+
+def db_to_generador_dict(g) -> dict:
+    """Convert GeneradorDB to dict compatible with Generador model"""
+    lat, lon = parse_ubicacion(g.ubicacion)
+    return {
+        "id": g.id,
+        "nombre": g.nombre,
+        "tipo": g.tipo,
+        "cif": g.cif,
+        "direccion": g.direccion,
+        "ubicacion_lat": lat,
+        "ubicacion_lon": lon,
+        "contacto_email": g.contacto_email,
+        "contacto_telefono": g.contacto_telefono,
+        "plan_suscripcion": g.plan_suscripcion,
+        "created_at": g.created_at,
+    }
+
+
+def db_to_receptor_dict(r) -> dict:
+    """Convert ReceptorDB to dict compatible with Receptor model"""
+    lat, lon = parse_ubicacion(r.ubicacion)
+    return {
+        "id": r.id,
+        "nombre": r.nombre,
+        "tipo": r.tipo,
+        "cif": r.cif,
+        "direccion": r.direccion,
+        "ubicacion_lat": lat,
+        "ubicacion_lon": lon,
+        "capacidad_kg_dia": r.capacidad_kg_dia,
+        "categorias_interes": r.categorias_interes or [],
+        "licencias": r.licencias or [],
+        "created_at": r.created_at,
+    }
+
+
+def db_to_lote_dict(l) -> dict:
+    """Convert LoteDB to dict compatible with Lote model"""
+    lat, lon = parse_ubicacion(l.ubicacion)
+    return {
+        "id": l.id,
+        "generador_id": l.generador_id,
+        "producto": l.producto,
+        "categoria": l.categoria,
+        "cantidad_kg": l.cantidad_kg,
+        "ubicacion_lat": lat,
+        "ubicacion_lon": lon,
+        "fecha_publicacion": l.fecha_publicacion,
+        "fecha_limite": l.fecha_limite,
+        "precio_base": l.precio_base,
+        "precio_actual": l.precio_actual,
+        "temperatura_conservacion": l.temperatura_conservacion,
+        "estado": l.estado,
+        "lote_origen": l.lote_origen,
+        "created_at": l.created_at,
+    }
+
+
 # ==================== GENERADOR ENDPOINTS ====================
 
 @app.post("/generadores", response_model=models.Generador, tags=["Generadores"])
@@ -221,7 +301,7 @@ def create_generador(
         db.commit()
         db.refresh(db_generador)
 
-        return db_generador
+        return db_to_generador_dict(db_generador)
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
@@ -238,7 +318,7 @@ def get_generador(generador_id: int, db: Session = Depends(get_db)):
     if not generador:
         raise HTTPException(status_code=404, detail="Generador no encontrado")
 
-    return generador
+    return db_to_generador_dict(generador)
 
 
 # ==================== RECEPTOR ENDPOINTS ====================
@@ -296,7 +376,7 @@ def create_receptor(
         db.commit()
         db.refresh(db_receptor)
 
-        return db_receptor
+        return db_to_receptor_dict(db_receptor)
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
@@ -313,7 +393,7 @@ def get_receptor(receptor_id: int, db: Session = Depends(get_db)):
     if not receptor:
         raise HTTPException(status_code=404, detail="Receptor no encontrado")
 
-    return receptor
+    return db_to_receptor_dict(receptor)
 
 
 # ==================== LOTE (LOT) ENDPOINTS ====================
@@ -396,7 +476,7 @@ def create_lot(
         db.commit()
         db.refresh(db_lote)
 
-        return db_lote
+        return db_to_lote_dict(db_lote)
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
@@ -462,8 +542,9 @@ def list_lots(
             database.PujaDB.lote_id == lote.id
         ).order_by(database.PujaDB.precio_oferta.desc()).first()
 
+        lote_dict = db_to_lote_dict(lote)
         result.append(models.LoteWithBids(
-            **{**lote.__dict__, "num_bids": num_bids, "precio_oferta_mas_alta": precio_mas_alto[0] if precio_mas_alto else None}
+            **{**lote_dict, "num_bids": num_bids, "precio_oferta_mas_alta": precio_mas_alto[0] if precio_mas_alto else None}
         ))
 
     return result
@@ -480,7 +561,7 @@ def get_lot(lot_id: int, db: Session = Depends(get_db)):
     if not lote:
         raise HTTPException(status_code=404, detail="Lote no encontrado")
 
-    return lote
+    return db_to_lote_dict(lote)
 
 
 # ==================== PUJA (BID) ENDPOINTS ====================
