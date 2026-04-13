@@ -6,7 +6,7 @@
 # Railway auto-detects Python from requirements.txt
 # Specify build command for Python
 builder = "dockerfile"
-dockerfile = "./Dockerfile.prod"
+dockerfile = "./Dockerfile"
 context = "."
 
 [deploy]
