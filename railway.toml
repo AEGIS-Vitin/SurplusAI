@@ -1,0 +1,75 @@
+# Railway.app deployment configuration for AEGIS-FOOD Marketplace
+# Deploy with: `railway up`
+# Documentation: https://docs.railway.app
+
+[build]
+# Railway auto-detects Python from requirements.txt
+# Specify build command for Python
+builder = "dockerfile"
+dockerfile = "./Dockerfile.prod"
+context = "."
+
+[deploy]
+# Start command for the application
+# Railway runs with Procfile or specified command
+startCommand = "cd backend && gunicorn -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT --timeout 120 main:app"
+
+# Port configuration
+port = 8000
+
+# Environment variables - Reference in Railway dashboard
+# These should be set in Railway project settings
+[env]
+# Application Configuration
+SECRET_KEY = "$SECRET_KEY"
+ENVIRONMENT = "production"
+LOG_LEVEL = "info"
+
+# Database
+DATABASE_URL = "$DATABASE_URL"
+
+# Redis Cache
+REDIS_URL = "$REDIS_URL"
+
+# Email Notifications
+NOTIFICATIONS_ENABLED = "true"
+SMTP_SERVER = "$SMTP_SERVER"
+SMTP_PORT = "$SMTP_PORT"
+SMTP_USERNAME = "$SMTP_USERNAME"
+SMTP_PASSWORD = "$SMTP_PASSWORD"
+SMTP_FROM_EMAIL = "$SMTP_FROM_EMAIL"
+
+# Application Settings
+WORKERS = "4"
+JWT_ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = "1440"
+
+# Health Check
+[healthcheck]
+path = "/health"
+interval = 30000  # milliseconds
+timeout = 10000
+
+# Service integrations - specify required services
+# Add PostgreSQL plugin in Railway dashboard
+# Add Redis plugin in Railway dashboard
+# Then configure environment variables from plugin outputs
+
+# Example Railway.app deployment:
+# 1. Create new project: `railway init`
+# 2. Add PostgreSQL plugin with PostGIS:
+#    - Run: `railway add` and select PostgreSQL
+#    - Note the $DATABASE_URL
+# 3. Add Redis plugin:
+#    - Run: `railway add` and select Redis
+#    - Note the $REDIS_URL
+# 4. Set environment variables:
+#    - SECRET_KEY: Generate with openssl rand -base64 32
+#    - SMTP_* variables for email
+#    - SMTP_FROM_EMAIL: noreply@yourdomain.com
+# 5. Deploy:
+#    - `railway up`
+
+# Post-deployment database migration (if using Alembic)
+# Override start command with:
+# startCommand = "cd backend && alembic upgrade head && gunicorn -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT main:app"

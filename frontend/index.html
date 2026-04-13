@@ -1,0 +1,1791 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AEGIS-FOOD - Mercado de Excedentes Alimentarios</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            color: #333;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        /* Mobile responsiveness improvements */
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            header {
+                padding: 20px;
+                margin-bottom: 20px;
+                flex-direction: column;
+                text-align: center;
+            }
+
+            header h1 {
+                font-size: 1.8em;
+            }
+
+            header .logo {
+                font-size: 2em;
+            }
+
+            .card {
+                padding: 15px;
+                margin-bottom: 15px;
+            }
+
+            .modal-content {
+                width: 95%;
+                padding: 20px;
+            }
+
+            table {
+                font-size: 0.85em;
+            }
+        }
+
+        @media (max-width: 480px) {
+            header {
+                padding: 15px;
+            }
+
+            header h1 {
+                font-size: 1.5em;
+            }
+
+            .card {
+                padding: 12px;
+            }
+
+            button {
+                padding: 8px 16px !important;
+                font-size: 0.9em;
+            }
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        header {
+            background: linear-gradient(135deg, #2d5016 0%, #4a7c2c 100%);
+            color: white;
+            padding: 30px;
+            margin-bottom: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            flex: 1;
+        }
+
+        header .logo {
+            font-size: 3em;
+        }
+
+        header .auth-buttons {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        header .auth-buttons button {
+            background: rgba(255,255,255,0.2);
+            border: 2px solid white;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        header .auth-buttons button:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        header .user-info {
+            color: white;
+            font-size: 0.9em;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h2 {
+            color: #2d5016;
+            margin: 0;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #666;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #ddd;
+            flex-wrap: wrap;
+        }
+
+        .tab-button {
+            padding: 12px 24px;
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s;
+        }
+
+        .tab-button.active {
+            color: #2d5016;
+            border-bottom-color: #2d5016;
+        }
+
+        .tab-button:hover {
+            color: #2d5016;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Cards */
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-left: 4px solid #4a7c2c;
+        }
+
+        .card h2 {
+            color: #2d5016;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+
+        .card h3 {
+            color: #4a7c2c;
+            margin-top: 15px;
+            margin-bottom: 10px;
+        }
+
+        /* Forms */
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        input[type="text"],
+        input[type="email"],
+        input[type="tel"],
+        input[type="number"],
+        input[type="date"],
+        input[type="datetime-local"],
+        input[type="password"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-family: inherit;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #4a7c2c;
+            box-shadow: 0 0 0 3px rgba(74, 124, 44, 0.1);
+        }
+
+        button {
+            background: linear-gradient(135deg, #2d5016 0%, #4a7c2c 100%);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(45, 80, 22, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.secondary {
+            background: #6c757d;
+        }
+
+        button.secondary:hover {
+            box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th {
+            background: #f0f0f0;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #2d5016;
+            border-bottom: 2px solid #ddd;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+        }
+
+        tr:hover {
+            background: #f9f9f9;
+        }
+
+        /* Stats */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #2d5016 0%, #4a7c2c 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .stat-card .number {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .stat-card .label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        /* Alerts */
+        .alert {
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            display: none;
+        }
+
+        .alert.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+
+        .alert.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+
+        .alert.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+            display: block;
+        }
+
+        /* Lots list */
+        .lot-item {
+            background: white;
+            border-left: 4px solid #4a7c2c;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .lot-item h3 {
+            color: #2d5016;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .lot-item .freshness-indicator {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: 600;
+        }
+
+        .lot-item .freshness-indicator.fresh {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .lot-item .freshness-indicator.expiring {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .lot-item .freshness-indicator.expired {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .lot-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 10px 0;
+        }
+
+        .lot-info-item {
+            padding: 10px;
+            background: #f9f9f9;
+            border-radius: 5px;
+        }
+
+        .lot-info-item strong {
+            color: #2d5016;
+            display: block;
+            font-size: 0.9em;
+        }
+
+        .lot-info-item .value {
+            font-size: 1.2em;
+            color: #333;
+            margin-top: 5px;
+        }
+
+        /* Price indicator */
+        .price-indicator {
+            background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            border-left: 4px solid #4a7c2c;
+        }
+
+        .price-indicator h4 {
+            color: #2d5016;
+            margin-bottom: 10px;
+        }
+
+        .price-breakdown {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        /* Compliance hierarchy */
+        .hierarchy-list {
+            list-style: none;
+            margin: 15px 0;
+        }
+
+        .hierarchy-list li {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .hierarchy-list li .number {
+            background: #2d5016;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9em;
+            flex-shrink: 0;
+        }
+
+        .hierarchy-list li.permitted {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+        }
+
+        .hierarchy-list li.blocked {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+        }
+
+        /* Grid layouts */
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .col-full {
+            grid-column: 1 / -1;
+        }
+
+        /* Loading spinner */
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4a7c2c;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Loading overlay */
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.3);
+            z-index: 999;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .loading-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .loading-content p {
+            margin-top: 15px;
+            color: #666;
+        }
+
+        /* Toast notifications */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1001;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 5px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            max-width: 350px;
+            border-left: 4px solid #4a7c2c;
+            animation: slideIn 0.3s ease-in-out;
+            position: relative;
+        }
+
+        .toast.error {
+            border-left-color: #dc3545;
+        }
+
+        .toast.warning {
+            border-left-color: #ffc107;
+        }
+
+        .toast.info {
+            border-left-color: #17a2b8;
+        }
+
+        .toast .close-toast {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #999;
+            padding: 0;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* Last updated timestamp */
+        .last-updated {
+            font-size: 0.85em;
+            color: #999;
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px solid #eee;
+        }
+
+        /* Lot card improvements */
+        .lot-item {
+            display: flex;
+            flex-direction: column;
+            transition: box-shadow 0.3s, transform 0.3s;
+        }
+
+        .lot-item:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .lot-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 12px;
+        }
+
+        .lot-title {
+            flex: 1;
+        }
+
+        .lot-status-badge {
+            flex-shrink: 0;
+            margin-left: 10px;
+        }
+
+        /* Keyboard accessibility */
+        :focus-visible {
+            outline: 2px solid #4a7c2c;
+            outline-offset: 2px;
+        }
+
+        button:focus-visible {
+            outline: 2px solid #4a7c2c;
+            outline-offset: 2px;
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-right: 5px;
+        }
+
+        .badge.estado-activo {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge.estado-expirado {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .badge.tipo-retail {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .badge.tipo-industria {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .small-text {
+            font-size: 0.85em;
+            color: #999;
+        }
+
+        /* Charts */
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin: 20px 0;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            header h1 {
+                font-size: 1.8em;
+            }
+
+            .row {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .modal-content {
+                width: 95%;
+                padding: 20px;
+            }
+
+            .lot-info {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Footer */
+        footer {
+            margin-top: 50px;
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            border-top: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p>Cargando...</p>
+        </div>
+    </div>
+
+    <!-- Toast notifications container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <div class="container">
+        <header>
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <div class="logo">🌿</div>
+                <div>
+                    <h1>AEGIS-FOOD</h1>
+                    <p>Mercado B2B de Excedentes Alimentarios</p>
+                </div>
+            </div>
+            <div class="auth-buttons">
+                <span class="user-info" id="user-info" style="display: none;"></span>
+                <button onclick="openLoginModal()">Iniciar Sesión</button>
+                <button class="secondary" onclick="openRegisterModal()">Registrarse</button>
+                <button class="secondary" id="logout-btn" style="display: none;" onclick="logout()">Cerrar Sesión</button>
+            </div>
+        </header>
+
+        <!-- Login Modal -->
+        <div id="login-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Iniciar Sesión</h2>
+                    <button class="close-btn" onclick="closeLoginModal()">×</button>
+                </div>
+                <div class="form-group">
+                    <label for="login-email">Email</label>
+                    <input type="email" id="login-email" placeholder="tu@email.com" aria-label="Email para iniciar sesión" tabindex="0">
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Contraseña</label>
+                    <input type="password" id="login-password" placeholder="Contraseña" aria-label="Contraseña" tabindex="0">
+                </div>
+                <div class="alert" id="login-alert" role="alert"></div>
+                <button onclick="login()" style="width: 100%;" tabindex="0" aria-label="Botón para iniciar sesión">Iniciar Sesión</button>
+            </div>
+        </div>
+
+        <!-- Register Modal -->
+        <div id="register-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Registrarse</h2>
+                    <button class="close-btn" onclick="closeRegisterModal()">×</button>
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="register-email" placeholder="tu@email.com">
+                </div>
+                <div class="form-group">
+                    <label>Contraseña</label>
+                    <input type="password" id="register-password" placeholder="Contraseña">
+                </div>
+                <div class="form-group">
+                    <label>Nombre de la Empresa</label>
+                    <input type="text" id="register-company" placeholder="Tu Empresa">
+                </div>
+                <div class="form-group">
+                    <label>ID de la Empresa</label>
+                    <input type="number" id="register-empresa-id" placeholder="123">
+                </div>
+                <div class="alert" id="register-alert"></div>
+                <button onclick="register()" style="width: 100%;">Registrarse</button>
+            </div>
+        </div>
+
+        <div class="tabs" id="tabs" style="display: none;">
+            <button class="tab-button active" onclick="switchTab('generador')">Generador</button>
+            <button class="tab-button" onclick="switchTab('receptor')">Receptor</button>
+            <button class="tab-button" onclick="switchTab('admin')">Dashboard</button>
+        </div>
+
+        <!-- GENERADOR TAB -->
+        <div id="generador" class="tab-content" style="display: none;">
+            <div class="card">
+                <h2>Publicar Nuevo Lote</h2>
+                <div class="alert" id="generador-alert"></div>
+
+                <div class="row">
+                    <div>
+                        <div class="form-group">
+                            <label>ID Generador</label>
+                            <input type="number" id="gen-id" placeholder="Ej: 1">
+                        </div>
+                        <div class="form-group">
+                            <label>Producto</label>
+                            <input type="text" id="gen-product" placeholder="Ej: Manzanas Golden">
+                        </div>
+                        <div class="form-group">
+                            <label>Categoría</label>
+                            <select id="gen-category">
+                                <option value="frutas">Frutas</option>
+                                <option value="verduras">Verduras</option>
+                                <option value="carnes">Carnes</option>
+                                <option value="pescados">Pescados</option>
+                                <option value="lacteos">Lácteos</option>
+                                <option value="panaderia">Panadería</option>
+                                <option value="prepared">Comidas Preparadas</option>
+                                <option value="otros">Otros</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="form-group">
+                            <label>Cantidad (kg)</label>
+                            <input type="number" id="gen-quantity" placeholder="100" step="0.1">
+                        </div>
+                        <div class="form-group">
+                            <label>Fecha Límite</label>
+                            <input type="datetime-local" id="gen-limit-date">
+                        </div>
+                        <div class="form-group">
+                            <label>Precio Base (EUR)</label>
+                            <input type="number" id="gen-price" placeholder="10.50" step="0.01">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div>
+                        <div class="form-group">
+                            <label>Latitud</label>
+                            <input type="number" id="gen-lat" placeholder="40.4168" step="0.0001">
+                        </div>
+                        <div class="form-group">
+                            <label>Temperatura Conservación (°C)</label>
+                            <input type="number" id="gen-temp" placeholder="4" step="0.1">
+                        </div>
+                    </div>
+                    <div>
+                        <div class="form-group">
+                            <label>Longitud</label>
+                            <input type="number" id="gen-lon" placeholder="-3.7038" step="0.0001">
+                        </div>
+                        <div class="form-group">
+                            <label>Lote Origen</label>
+                            <input type="text" id="gen-origin" placeholder="LOTE_001_2025">
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="publishLot()">Publicar Lote</button>
+                <button class="secondary" onclick="getSuggestedPrice()">Sugerir Precio</button>
+            </div>
+
+            <div class="card">
+                <h2>Mis Lotes Publicados</h2>
+                <button onclick="listMyLots()">Cargar Mis Lotes</button>
+                <div id="my-lots"></div>
+            </div>
+
+            <div class="card">
+                <h2>Recomendaciones de Compradores</h2>
+                <button onclick="getMatches()">Ver Recomendaciones</button>
+                <div id="matches-list"></div>
+            </div>
+        </div>
+
+        <!-- RECEPTOR TAB -->
+        <div id="receptor" class="tab-content" style="display: none;">
+            <div class="card">
+                <h2>Buscar Lotes Disponibles</h2>
+                <div class="alert" id="receptor-alert"></div>
+
+                <div class="row">
+                    <div>
+                        <div class="form-group">
+                            <label>Categoría</label>
+                            <select id="search-category">
+                                <option value="">Todas</option>
+                                <option value="frutas">Frutas</option>
+                                <option value="verduras">Verduras</option>
+                                <option value="carnes">Carnes</option>
+                                <option value="pescados">Pescados</option>
+                                <option value="lacteos">Lácteos</option>
+                                <option value="panaderia">Panadería</option>
+                                <option value="prepared">Comidas Preparadas</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Precio Máximo (EUR)</label>
+                            <input type="number" id="search-max-price" placeholder="50" step="0.01">
+                        </div>
+                    </div>
+                    <div>
+                        <div class="form-group">
+                            <label>Radio (km)</label>
+                            <input type="number" id="search-radius" value="50" step="1">
+                        </div>
+                        <div class="form-group">
+                            <label>Mostrar Jerarquía Legal</label>
+                            <button onclick="showCompliance()" style="margin-top: 5px;">Ver Jerarquía Ley 1/2025</button>
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="searchLots()">Buscar Lotes</button>
+                <div id="lots-search-results"></div>
+            </div>
+
+            <div id="compliance-section" class="card" style="display:none;">
+                <h2>Jerarquía Legal de Usos (Ley 1/2025)</h2>
+                <div id="compliance-hierarchy"></div>
+            </div>
+
+            <div class="card">
+                <h2>Realizar Oferta</h2>
+                <div class="row">
+                    <div>
+                        <div class="form-group">
+                            <label>ID del Lote</label>
+                            <input type="number" id="bid-lot-id" placeholder="Ej: 1">
+                        </div>
+                        <div class="form-group">
+                            <label>ID Receptor</label>
+                            <input type="number" id="bid-receptor-id" placeholder="Ej: 1">
+                        </div>
+                    </div>
+                    <div>
+                        <div class="form-group">
+                            <label>Precio Oferta (EUR)</label>
+                            <input type="number" id="bid-price" placeholder="8.50" step="0.01">
+                        </div>
+                        <div class="form-group">
+                            <label>Uso Previsto</label>
+                            <select id="bid-use">
+                                <option value="2">Donación para Consumo Humano</option>
+                                <option value="3">Transformación</option>
+                                <option value="4">Alimentación Animal</option>
+                                <option value="5">Uso Industrial</option>
+                                <option value="6">Compostaje</option>
+                                <option value="7">Biogás</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Mensaje (Opcional)</label>
+                    <textarea id="bid-message" placeholder="Información adicional..." rows="3"></textarea>
+                </div>
+
+                <button onclick="placeBid()">Realizar Oferta</button>
+            </div>
+
+            <div class="card">
+                <h2>Mis Ofertas</h2>
+                <div id="my-bids"></div>
+            </div>
+        </div>
+
+        <!-- ADMIN TAB -->
+        <div id="admin" class="tab-content" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="margin: 0;">Dashboard</h2>
+                <div class="last-updated">
+                    <small>Última actualización: <span id="last-update-time">--</span></small>
+                </div>
+            </div>
+
+            <div class="stats-grid" id="stats-grid">
+                <div class="stat-card">
+                    <div class="label">Total Salvado</div>
+                    <div class="number" id="stat-kg">0</div>
+                    <div class="label">kg de comida</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Transacciones</div>
+                    <div class="number" id="stat-transactions">0</div>
+                    <div class="label">operaciones completadas</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">CO2 Evitado</div>
+                    <div class="number" id="stat-co2">0</div>
+                    <div class="label">kg CO2e</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Dinero Transaccionado</div>
+                    <div class="number" id="stat-money">€0</div>
+                    <div class="label">en transacciones</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Participantes</h2>
+                <div class="row">
+                    <div>
+                        <h3>Generadores Registrados</h3>
+                        <div id="num-generators" class="stat-card">
+                            <div class="number">0</div>
+                        </div>
+                    </div>
+                    <div>
+                        <h3>Receptores Registrados</h3>
+                        <div id="num-receivers" class="stat-card">
+                            <div class="number">0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Transacciones por Día (Últimos 30 días)</h2>
+                <div class="chart-container">
+                    <canvas id="transactions-chart"></canvas>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Distribución por Categoría</h2>
+                <div class="chart-container">
+                    <canvas id="category-chart"></canvas>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Impacto Ambiental por Categoría</h2>
+                <div id="carbon-data"></div>
+            </div>
+
+            <div class="card">
+                <h2>Generadores Más Activos</h2>
+                <div id="top-generators"></div>
+            </div>
+
+            <div class="card">
+                <h2>Receptores Más Activos</h2>
+                <div id="top-receivers"></div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>AEGIS-FOOD © 2025 - Marketplace de Excedentes Alimentarios | Compliance con Ley 1/2025</p>
+    </footer>
+
+    <script>
+        const API_URL = 'http://localhost:8000';
+        let authToken = localStorage.getItem('authToken');
+        let currentUser = null;
+
+        // Initialize on page load
+        window.addEventListener('load', () => {
+            checkAuth();
+            if (authToken) {
+                showTabs();
+                loadStats();
+                setDefaultLimitDate();
+            }
+        });
+
+        // Authentication functions
+        function openLoginModal() {
+            document.getElementById('login-modal').classList.add('active');
+        }
+
+        function closeLoginModal() {
+            document.getElementById('login-modal').classList.remove('active');
+            clearLoginForm();
+        }
+
+        function openRegisterModal() {
+            document.getElementById('register-modal').classList.add('active');
+        }
+
+        function closeRegisterModal() {
+            document.getElementById('register-modal').classList.remove('active');
+            clearRegisterForm();
+        }
+
+        function clearLoginForm() {
+            document.getElementById('login-email').value = '';
+            document.getElementById('login-password').value = '';
+            document.getElementById('login-alert').className = 'alert';
+        }
+
+        function clearRegisterForm() {
+            document.getElementById('register-email').value = '';
+            document.getElementById('register-password').value = '';
+            document.getElementById('register-company').value = '';
+            document.getElementById('register-empresa-id').value = '';
+            document.getElementById('register-alert').className = 'alert';
+        }
+
+        async function login() {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+
+            if (!email || !password) {
+                showAlert('Por favor completa todos los campos', 'error', 'login-alert');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Error en el login');
+                }
+
+                const data = await response.json();
+                authToken = data.access_token;
+                localStorage.setItem('authToken', authToken);
+
+                closeLoginModal();
+                checkAuth();
+                showTabs();
+                loadStats();
+                showAlert('Sesión iniciada exitosamente', 'success', 'generador-alert');
+            } catch (error) {
+                showAlert(`Error: ${error.message}`, 'error', 'login-alert');
+            }
+        }
+
+        async function register() {
+            const email = document.getElementById('register-email').value;
+            const password = document.getElementById('register-password').value;
+            const company = document.getElementById('register-company').value;
+            const empresaId = parseInt(document.getElementById('register-empresa-id').value);
+
+            if (!email || !password || !company || !empresaId) {
+                showAlert('Por favor completa todos los campos', 'error', 'register-alert');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email,
+                        password,
+                        nombre_empresa: company,
+                        empresa_id: empresaId,
+                        rol: 'user'
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Error en el registro');
+                }
+
+                showAlert('Registro exitoso. Por favor inicia sesión.', 'success', 'register-alert');
+                closeRegisterModal();
+            } catch (error) {
+                showAlert(`Error: ${error.message}`, 'error', 'register-alert');
+            }
+        }
+
+        function logout() {
+            authToken = null;
+            localStorage.removeItem('authToken');
+            currentUser = null;
+            hideTabs();
+            checkAuth();
+        }
+
+        async function checkAuth() {
+            if (!authToken) {
+                document.getElementById('user-info').style.display = 'none';
+                document.getElementById('logout-btn').style.display = 'none';
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/auth/me`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (response.ok) {
+                    currentUser = await response.json();
+                    const userInfo = document.getElementById('user-info');
+                    userInfo.textContent = `Hola, ${currentUser.nombre_empresa}`;
+                    userInfo.style.display = 'block';
+                    document.getElementById('logout-btn').style.display = 'block';
+                } else {
+                    logout();
+                }
+            } catch (error) {
+                logout();
+            }
+        }
+
+        function showTabs() {
+            document.getElementById('tabs').style.display = 'flex';
+            document.getElementById('generador').style.display = 'block';
+        }
+
+        function hideTabs() {
+            document.getElementById('tabs').style.display = 'none';
+            document.getElementById('generador').style.display = 'none';
+            document.getElementById('receptor').style.display = 'none';
+            document.getElementById('admin').style.display = 'none';
+        }
+
+        // Tab switching
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active'));
+
+            document.getElementById(tabName).style.display = 'block';
+            event.target.classList.add('active');
+
+            if (tabName === 'admin') {
+                loadStats();
+            }
+        }
+
+        // Helper functions
+        function showAlert(message, type = 'success', elementId = 'generador-alert') {
+            const alert = document.getElementById(elementId);
+            alert.textContent = message;
+            alert.className = `alert ${type}`;
+            setTimeout(() => {
+                alert.className = 'alert';
+            }, 5000);
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                ${message}
+                <button class="close-toast" onclick="this.parentElement.remove();">×</button>
+            `;
+            container.appendChild(toast);
+
+            // Auto-dismiss after 4 seconds
+            setTimeout(() => {
+                if (toast.parentElement) {
+                    toast.remove();
+                }
+            }, 4000);
+        }
+
+        function showLoading(show = true) {
+            const overlay = document.getElementById('loading-overlay');
+            if (show) {
+                overlay.classList.add('active');
+            } else {
+                overlay.classList.remove('active');
+            }
+        }
+
+        function updateLastUpdated() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('es-ES', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            const dateStr = now.toLocaleDateString('es-ES');
+            document.getElementById('last-update-time').textContent = `${dateStr} ${timeStr}`;
+        }
+
+        async function fetchAPI(endpoint, options = {}) {
+            const headers = { 'Content-Type': 'application/json' };
+            if (authToken) {
+                headers['Authorization'] = `Bearer ${authToken}`;
+            }
+
+            showLoading(true);
+            try {
+                const response = await fetch(`${API_URL}${endpoint}`, {
+                    headers: { ...headers, ...options.headers },
+                    ...options
+                });
+
+                if (!response.ok) {
+                    let errorMessage = 'Error en la solicitud';
+                    try {
+                        const error = await response.json();
+                        errorMessage = error.detail || errorMessage;
+                    } catch (e) {
+                        // If response is not JSON, use status text
+                        errorMessage = response.statusText || errorMessage;
+                    }
+
+                    // Handle specific error codes
+                    if (response.status === 401) {
+                        logout();
+                        errorMessage = 'Sesión expirada, por favor inicia sesión de nuevo';
+                    } else if (response.status === 403) {
+                        errorMessage = 'No tienes permiso para realizar esta acción';
+                    } else if (response.status === 422) {
+                        errorMessage = 'Datos inválidos: verifica tus entradas';
+                    } else if (response.status === 500) {
+                        errorMessage = 'Error del servidor, intenta de nuevo más tarde';
+                    }
+
+                    showToast(errorMessage, 'error');
+                    throw new Error(errorMessage);
+                }
+
+                const data = await response.json();
+                updateLastUpdated();
+                return data;
+            } catch (error) {
+                // Network error or other issues
+                if (error instanceof TypeError) {
+                    showToast('Error de conexión: verifica tu conexión a internet', 'error');
+                } else {
+                    showToast(error.message || 'Error desconocido', 'error');
+                }
+                throw error;
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // GENERADOR FUNCTIONS
+        function publishLot() {
+            if (!authToken) {
+                showAlert('Por favor inicia sesión primero', 'error', 'generador-alert');
+                return;
+            }
+
+            // Validate all required fields
+            const producto = document.getElementById('gen-product').value.trim();
+            const categoria = document.getElementById('gen-category').value;
+            const cantidad = parseFloat(document.getElementById('gen-quantity').value);
+            const lat = parseFloat(document.getElementById('gen-lat').value);
+            const lon = parseFloat(document.getElementById('gen-lon').value);
+            const limitDate = document.getElementById('gen-limit-date').value;
+            const precio = parseFloat(document.getElementById('gen-price').value);
+
+            // Validation checks
+            if (!producto) {
+                showAlert('El nombre del producto es requerido', 'error', 'generador-alert');
+                return;
+            }
+
+            if (!categoria) {
+                showAlert('Selecciona una categoría', 'error', 'generador-alert');
+                return;
+            }
+
+            if (isNaN(cantidad) || cantidad <= 0) {
+                showAlert('La cantidad debe ser mayor a 0', 'error', 'generador-alert');
+                return;
+            }
+
+            if (isNaN(lat) || lat < -90 || lat > 90) {
+                showAlert('Latitud inválida (debe estar entre -90 y 90)', 'error', 'generador-alert');
+                return;
+            }
+
+            if (isNaN(lon) || lon < -180 || lon > 180) {
+                showAlert('Longitud inválida (debe estar entre -180 y 180)', 'error', 'generador-alert');
+                return;
+            }
+
+            if (!limitDate) {
+                showAlert('La fecha límite es requerida', 'error', 'generador-alert');
+                return;
+            }
+
+            if (new Date(limitDate) <= new Date()) {
+                showAlert('La fecha límite debe ser en el futuro', 'error', 'generador-alert');
+                return;
+            }
+
+            if (isNaN(precio) || precio <= 0) {
+                showAlert('El precio debe ser mayor a 0', 'error', 'generador-alert');
+                return;
+            }
+
+            const lot = {
+                generador_id: parseInt(document.getElementById('gen-id').value),
+                producto: producto,
+                categoria: categoria,
+                cantidad_kg: cantidad,
+                ubicacion_lat: lat,
+                ubicacion_lon: lon,
+                fecha_limite: new Date(limitDate).toISOString(),
+                precio_base: precio,
+                temperatura_conservacion: parseFloat(document.getElementById('gen-temp').value) || null,
+                lote_origen: document.getElementById('gen-origin').value || null
+            };
+
+            fetchAPI('/lots', { method: 'POST', body: JSON.stringify(lot) })
+                .then(data => {
+                    showAlert(`Lote publicado exitosamente (ID: ${data.id})`, 'success', 'generador-alert');
+                    document.querySelectorAll('#generador input, #generador select').forEach(el => el.value = '');
+                    setDefaultLimitDate();
+                })
+                .catch(error => showAlert(`Error: ${error.message}`, 'error', 'generador-alert'));
+        }
+
+        function getSuggestedPrice() {
+            const categoria = document.getElementById('gen-category').value;
+            const cantidad = parseFloat(document.getElementById('gen-quantity').value);
+
+            if (!cantidad) {
+                showAlert('Introduce una cantidad', 'error', 'generador-alert');
+                return;
+            }
+
+            fetchAPI(`/price-suggestion?categoria=${categoria}&cantidad_kg=${cantidad}&tipo_generador=retail`)
+                .then(data => {
+                    showAlert(`Precio sugerido: €${data.precio_sugerido_eur} (€${data.precio_por_kg}/kg)`, 'success', 'generador-alert');
+                    document.getElementById('gen-price').value = data.precio_sugerido_eur;
+                })
+                .catch(error => showAlert(`Error: ${error.message}`, 'error', 'generador-alert'));
+        }
+
+        function listMyLots() {
+            fetchAPI('/lots')
+                .then(lots => {
+                    let html = '<table><thead><tr><th>ID</th><th>Producto</th><th>Cantidad</th><th>Precio</th><th>Estado</th><th>Ofertas</th></tr></thead><tbody>';
+                    lots.forEach(lot => {
+                        html += `<tr>
+                            <td>${lot.id}</td>
+                            <td>${lot.producto}</td>
+                            <td>${lot.cantidad_kg} kg</td>
+                            <td>€${lot.precio_actual}</td>
+                            <td><span class="badge estado-${lot.estado}">${lot.estado}</span></td>
+                            <td>${lot.num_bids || 0}</td>
+                        </tr>`;
+                    });
+                    html += '</tbody></table>';
+                    document.getElementById('my-lots').innerHTML = html;
+                })
+                .catch(error => showAlert(`Error: ${error.message}`, 'error', 'generador-alert'));
+        }
+
+        function getMatches() {
+            const generadorId = document.getElementById('gen-id').value;
+            if (!generadorId) {
+                showAlert('Introduce tu ID de generador', 'error', 'generador-alert');
+                return;
+            }
+
+            fetchAPI(`/matches?generador_id=${generadorId}`)
+                .then(matches => {
+                    let html = '';
+                    matches.forEach(match => {
+                        html += `
+                            <div class="lot-item">
+                                <h3>${match.receptor_nombre}</h3>
+                                <div class="lot-info">
+                                    <div class="lot-info-item">
+                                        <strong>Producto Predicho</strong>
+                                        <div class="value">${match.producto_predicho}</div>
+                                    </div>
+                                    <div class="lot-info-item">
+                                        <strong>Cantidad Esperada</strong>
+                                        <div class="value">${match.cantidad_predicha_kg} kg</div>
+                                    </div>
+                                    <div class="lot-info-item">
+                                        <strong>Score de Compatibilidad</strong>
+                                        <div class="value">${(match.score_match * 100).toFixed(0)}%</div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    document.getElementById('matches-list').innerHTML = html || '<p>No hay recomendaciones disponibles</p>';
+                })
+                .catch(error => showAlert(`Error: ${error.message}`, 'error', 'generador-alert'));
+        }
+
+        // RECEPTOR FUNCTIONS
+        function searchLots() {
+            const params = new URLSearchParams();
+            const category = document.getElementById('search-category').value;
+            const maxPrice = document.getElementById('search-max-price').value;
+            const radius = document.getElementById('search-radius').value;
+
+            if (category) params.append('categoria', category);
+            if (maxPrice) params.append('precio_max', maxPrice);
+            if (radius) params.append('radio_km', radius);
+
+            fetchAPI(`/lots?${params.toString()}`)
+                .then(lots => {
+                    let html = '';
+                    lots.forEach(lot => {
+                        const expiryDate = new Date(lot.fecha_limite);
+                        const now = new Date();
+                        const daysLeft = Math.floor((expiryDate - now) / (1000 * 60 * 60 * 24));
+
+                        let freshnessClass = 'fresh';
+                        let freshnessText = 'Fresco';
+                        if (daysLeft <= 1) {
+                            freshnessClass = 'expired';
+                            freshnessText = 'Vence hoy';
+                        } else if (daysLeft <= 3) {
+                            freshnessClass = 'expiring';
+                            freshnessText = 'Vence pronto';
+                        }
+
+                        html += `
+                            <div class="lot-item" role="article" tabindex="0">
+                                <div class="lot-header">
+                                    <div class="lot-title">
+                                        <h3 style="margin-bottom: 5px;">${lot.producto}</h3>
+                                        <small style="color: #999;">ID: ${lot.id} | Categoría: ${lot.categoria}</small>
+                                    </div>
+                                    <span class="lot-status-badge freshness-indicator ${freshnessClass}" aria-label="Estado de frescura">${freshnessText}</span>
+                                </div>
+                                <div class="lot-info">
+                                    <div class="lot-info-item">
+                                        <strong>Cantidad</strong>
+                                        <div class="value">${lot.cantidad_kg} kg</div>
+                                    </div>
+                                    <div class="lot-info-item">
+                                        <strong>Precio Actual</strong>
+                                        <div class="value">€${lot.precio_actual}</div>
+                                    </div>
+                                    <div class="lot-info-item">
+                                        <strong>Vencimiento</strong>
+                                        <div class="value">${new Date(lot.fecha_limite).toLocaleDateString('es-ES')}</div>
+                                    </div>
+                                    <div class="lot-info-item">
+                                        <strong>Ofertas Recibidas</strong>
+                                        <div class="value">${lot.num_bids || 0}</div>
+                                    </div>
+                                </div>
+                                <div class="price-indicator">
+                                    <h4>Indicador de Precio Dinámico</h4>
+                                    <div class="price-breakdown">
+                                        Precio base: €${lot.precio_base} → Actual: €${lot.precio_actual}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    document.getElementById('lots-search-results').innerHTML = html || '<p>No hay lotes disponibles</p>';
+                })
+                .catch(error => showAlert(`Error: ${error.message}`, 'error', 'receptor-alert'));
+        }
+
+        function showCompliance() {
+            document.getElementById('compliance-section').style.display = 'block';
+
+            fetchAPI('/compliance-hierarchy')
+                .then(hierarchy => {
+                    let html = '<ul class="hierarchy-list">';
+                    Object.entries(hierarchy).forEach(([num, data]) => {
+                        html += `
+                            <li class="permitted">
+                                <div class="number">${num}</div>
+                                <div>
+                                    <strong>${data.nombre}</strong><br>
+                                    <span class="small-text">${data.descripcion}</span>
+                                </div>
+                            </li>
+                        `;
+                    });
+                    html += '</ul>';
+                    document.getElementById('compliance-hierarchy').innerHTML = html;
+                })
+                .catch(error => console.error(error));
+        }
+
+        function placeBid() {
+            if (!authToken) {
+                showAlert('Por favor inicia sesión primero', 'error', 'receptor-alert');
+                return;
+            }
+
+            const bid = {
+                lote_id: parseInt(document.getElementById('bid-lot-id').value),
+                receptor_id: parseInt(document.getElementById('bid-receptor-id').value),
+                precio_oferta: parseFloat(document.getElementById('bid-price').value),
+                uso_previsto: parseInt(document.getElementById('bid-use').value),
+                mensaje: document.getElementById('bid-message').value || null
+            };
+
+            fetchAPI('/bids', { method: 'POST', body: JSON.stringify(bid) })
+                .then(data => {
+                    showAlert(`Oferta realizada exitosamente (ID: ${data.id})`, 'success', 'receptor-alert');
+                    document.querySelectorAll('#receptor input, #receptor select, #receptor textarea').forEach(el => el.value = '');
+                })
+                .catch(error => showAlert(`Error: ${error.message}`, 'error', 'receptor-alert'));
+        }
+
+        // ADMIN FUNCTIONS
+        let transactionsChart = null;
+        let categoryChart = null;
+
+        async function loadStats() {
+            try {
+                const stats = await fetchAPI('/stats');
+                document.getElementById('stat-kg').textContent = stats.total_kg_saved.toFixed(0);
+                document.getElementById('stat-transactions').textContent = stats.total_transactions;
+                document.getElementById('stat-co2').textContent = stats.co2_avoided_kg.toFixed(0);
+                document.getElementById('stat-money').textContent = '€' + stats.money_saved.toFixed(0);
+                document.getElementById('num-generators').innerHTML = `<div class="number">${stats.num_generadores}</div>`;
+                document.getElementById('num-receivers').innerHTML = `<div class="number">${stats.num_receptores}</div>`;
+
+                // Load dashboard data
+                const dashboard = await fetchAPI('/dashboard');
+                renderCharts(dashboard);
+                renderTopLists(dashboard);
+                updateLastUpdated();
+            } catch (error) {
+                console.error(error);
+                showToast('Error al cargar estadísticas', 'error');
+            }
+        }
+
+        function renderCharts(dashboard) {
+            // Transactions per day chart
+            const daysData = dashboard.time_series.transactions_per_day;
+            const labels = Object.keys(daysData).slice(-30);
+            const data = labels.map(d => daysData[d]);
+
+            const transCanvas = document.getElementById('transactions-chart');
+            if (transCanvas) {
+                if (transactionsChart) transactionsChart.destroy();
+                transactionsChart = new Chart(transCanvas, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Transacciones por Día',
+                            data: data,
+                            borderColor: '#4a7c2c',
+                            backgroundColor: 'rgba(74, 124, 44, 0.1)',
+                            tension: 0.1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: true }
+                        }
+                    }
+                });
+            }
+
+            // Category chart
+            const categoryLabels = Object.keys(dashboard.categories);
+            const categoryValues = categoryLabels.map(cat => dashboard.categories[cat].kg);
+
+            const catCanvas = document.getElementById('category-chart');
+            if (catCanvas) {
+                if (categoryChart) categoryChart.destroy();
+                categoryChart = new Chart(catCanvas, {
+                    type: 'doughnut',
+                    data: {
+                        labels: categoryLabels,
+                        datasets: [{
+                            data: categoryValues,
+                            backgroundColor: [
+                                '#ff6384',
+                                '#36a2eb',
+                                '#ffce56',
+                                '#4bc0c0',
+                                '#9966ff',
+                                '#ff9f40',
+                                '#ff6384',
+                                '#c9cbcf'
+                            ]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            }
+        }
+
+        function renderTopLists(dashboard) {
+            // Top generators
+            let genHtml = '<table><thead><tr><th>Generador</th><th>Kg Salvados</th><th>Transacciones</th></tr></thead><tbody>';
+            dashboard.top_generators.forEach(gen => {
+                genHtml += `<tr><td>${gen.nombre}</td><td>${gen.kg.toFixed(1)} kg</td><td>${gen.transactions}</td></tr>`;
+            });
+            genHtml += '</tbody></table>';
+            document.getElementById('top-generators').innerHTML = genHtml;
+
+            // Top receptors
+            let recHtml = '<table><thead><tr><th>Receptor</th><th>Kg Recibidos</th><th>Transacciones</th></tr></thead><tbody>';
+            dashboard.top_receptors.forEach(rec => {
+                recHtml += `<tr><td>${rec.nombre}</td><td>${rec.kg.toFixed(1)} kg</td><td>${rec.transactions}</td></tr>`;
+            });
+            recHtml += '</tbody></table>';
+            document.getElementById('top-receivers').innerHTML = recHtml;
+
+            // Carbon data
+            fetchAPI('/carbon-footprints')
+                .then(data => {
+                    let html = '<table><thead><tr><th>Categoría</th><th>CO2 por kg</th><th>Rango Típico</th></tr></thead><tbody>';
+                    Object.entries(data).forEach(([cat, info]) => {
+                        html += `<tr><td>${info.descripcion}</td><td>${info.valor} kg CO2e</td><td>${info.rango}</td></tr>`;
+                    });
+                    html += '</tbody></table>';
+                    document.getElementById('carbon-data').innerHTML = html;
+                })
+                .catch(error => console.error(error));
+        }
+
+        function setDefaultLimitDate() {
+            const futureDate = new Date();
+            futureDate.setDate(futureDate.getDate() + 3);
+            document.getElementById('gen-limit-date').value = futureDate.toISOString().slice(0, 16);
+        }
+
+        // Close modals when clicking outside
+        window.onclick = function(event) {
+            const loginModal = document.getElementById('login-modal');
+            const registerModal = document.getElementById('register-modal');
+
+            if (event.target == loginModal) loginModal.classList.remove('active');
+            if (event.target == registerModal) registerModal.classList.remove('active');
+        }
+    </script>
+</body>
+</html>
