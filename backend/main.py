@@ -101,16 +101,21 @@ def register(
 
     Returns: User details and can be used to login
     """
-    user = auth.create_user(
-        db,
-        email=user_data.email,
-        password=user_data.password,
-        empresa_id=user_data.empresa_id,
-        nombre_empresa=user_data.nombre_empresa,
-        rol=user_data.rol
-    )
-
-    return user
+    try:
+        user = auth.create_user(
+            db,
+            email=user_data.email,
+            password=user_data.password,
+            empresa_id=user_data.empresa_id,
+            nombre_empresa=user_data.nombre_empresa,
+            rol=user_data.rol
+        )
+        return user
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Registration error: {str(e)}")
 
 
 @app.post("/auth/login", response_model=auth.Token, tags=["Authentication"])
