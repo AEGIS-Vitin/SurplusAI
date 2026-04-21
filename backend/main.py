@@ -5,10 +5,13 @@ Main FastAPI application with JWT authentication and email notifications.
 
 from fastapi import FastAPI, Depends, HTTPException, Query, Header
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from typing import List, Optional
 import os
+import re
 from dotenv import load_dotenv
 
 import models
@@ -32,18 +35,39 @@ app = FastAPI(
     openapi_url="/openapi.json"
 )
 
-# Add CORS middleware
+# ---- CORS ----
+# In production we lock to known origins; in dev we allow localhost on any port.
+# Override via CORS_ORIGINS env var (comma-separated) if needed.
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
+_default_origins_prod = ["https://surplusai.es", "https://www.surplusai.es"]
+_default_origin_regex = r"^http://localhost(:\d+)?$"
+
+_cors_override = os.getenv("CORS_ORIGINS")
+if _cors_override:
+    allow_origins = [o.strip() for o in _cors_override.split(",") if o.strip()]
+    allow_origin_regex = None
+elif ENVIRONMENT == "production":
+    allow_origins = _default_origins_prod
+    allow_origin_regex = _default_origin_regex  # still allow localhost for smoke tests
+else:
+    allow_origins = ["*"]
+    allow_origin_regex = None
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allow_origins,
+    allow_origin_regex=allow_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Initialize database (only if not in test mode)
+# Initialize database (only if not in test mode).
+# In production, prefer `alembic upgrade head` at release time; we keep
+# create_all as a safety net when MIGRATIONS=alembic is NOT set.
 if os.getenv("TESTING", "false").lower() != "true":
-    database.init_db()
+    if os.getenv("MIGRATIONS", "create_all").lower() != "alembic":
+        database.init_db()
 
 
 # Dependency for database session
@@ -1075,6 +1099,28 @@ def suggest_price(
         "precio_sugerido_eur": suggested_price,
         "precio_por_kg": round(suggested_price / cantidad_kg, 2) if cantidad_kg > 0 else 0
     }
+
+
+# ---- Root redirect ----
+# Anyone hitting https://surplusai.es/ lands on the SPA at /app/.
+# 302 (not 301) to avoid aggressive browser caching while the app evolves.
+@app.get("/", include_in_schema=False)
+async def root_redirect():
+    return RedirectResponse(url="/app/", status_code=302)
+
+
+# ---- Serve frontend ----
+# Mount the static SPA at /app so the same container serves both API and UI.
+# This keeps the deploy single-service (Railway / any PaaS) without a separate
+# nginx box. Register this LAST so /docs, /health, /auth/*, etc. still resolve.
+_frontend_path = os.path.join(os.path.dirname(__file__), "..", "frontend")
+_frontend_path = os.path.abspath(_frontend_path)
+if os.path.isdir(_frontend_path):
+    app.mount(
+        "/app",
+        StaticFiles(directory=_frontend_path, html=True),
+        name="frontend",
+    )
 
 
 if __name__ == "__main__":
