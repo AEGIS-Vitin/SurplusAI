@@ -20,9 +20,59 @@ import database
 import pricing
 import compliance
 import matching
+import auto_matching
 import carbon
 import auth
 import notifications
+
+
+# ---- SurplusAI pricing constants (P0.2 — see VERDICT_BUSINESS_MODEL.md) ----
+# "Logística: €0.25/km + MÍNIMO €25-30 por recogida (insight Gemini crítico —
+#  sin esto te matan las recogidas pequeñas)."
+# We go with €25 as the floor, which is also what the frontend advertises.
+LOGISTICS_PER_KM_EUR = 0.25
+LOGISTICS_MIN_FEE_EUR = 25.0
+# Service fee per lot scales with weight (P0.3 distribution §: €20–40 typical).
+SERVICE_FEE_BY_WEIGHT = [
+    # (max_kg_exclusive, fee_eur)
+    (100, 20.0),
+    (500, 25.0),
+    (1500, 30.0),
+    (5000, 40.0),
+    (float("inf"), 80.0),   # big lots (>5t) go to Enterprise bracket
+]
+# Biomass / compost / feed revenue per tonne (plant pays SurplusAI for the raw
+# material — we are the contract holder, per Grok/Gemini consensus).
+BIOMASS_REVENUE_EUR_PER_TONNE = {
+    "biomass_biogas": 55.0,
+    "energy_biogas": 45.0,
+    "compost": 30.0,
+    "cattle_feed": 40.0,
+    "food_bank": 0.0,
+    "donated_ong": 0.0,
+}
+
+
+def calculate_logistics_fee(distance_km: Optional[float]) -> float:
+    """€0.25/km with a hard floor at €25 (P0.2 — see docstring above)."""
+    if distance_km is None or distance_km <= 0:
+        return LOGISTICS_MIN_FEE_EUR
+    computed = distance_km * LOGISTICS_PER_KM_EUR
+    return round(max(computed, LOGISTICS_MIN_FEE_EUR), 2)
+
+
+def calculate_service_fee(cantidad_kg: float) -> float:
+    for max_kg, fee in SERVICE_FEE_BY_WEIGHT:
+        if cantidad_kg < max_kg:
+            return fee
+    return SERVICE_FEE_BY_WEIGHT[-1][1]
+
+
+def calculate_biomass_revenue(outcome: Optional[str], cantidad_kg: float) -> float:
+    if not outcome:
+        return 0.0
+    per_tonne = BIOMASS_REVENUE_EUR_PER_TONNE.get(outcome, 0.0)
+    return round(per_tonne * (cantidad_kg / 1000.0), 2)
 
 load_dotenv()
 
@@ -520,14 +570,15 @@ def create_lot(
     if not generador:
         raise HTTPException(status_code=404, detail="Generador no encontrado")
 
-    # Calculate initial price
-    precio_actual = pricing.calculate_dynamic_price(
-        lote.precio_base,
-        lote.fecha_limite,
-        datetime.utcnow(),
-        num_bids=0,
-        categoria=lote.categoria.value
-    )
+    # ---- Dutch auction KILLED (P0.1) ----
+    # The original model recomputed precio_actual as a descending-price
+    # auction. VERDICT_BUSINESS_MODEL.md (Gemini leg, endorsed by Victor)
+    # flagged this as a strategic error: SurplusAI charges logistics +
+    # service fee + biomass revenue, NOT a cut of an auction. The price of
+    # the *food* is whatever the generator sets (often 0€ or symbolic) and
+    # it STAYS THERE. Dynamic pricing pressure creates perverse incentives
+    # and penalises donations.
+    precio_actual = lote.precio_base
 
     try:
         # Store location - use PostGIS if available, plain text otherwise
@@ -554,6 +605,30 @@ def create_lot(
         db.add(db_lote)
         db.commit()
         db.refresh(db_lote)
+
+        # ---- Run automatic matching (P0.1) ----
+        # Fire-and-forget; if scoring fails we don't want to kill the POST.
+        try:
+            candidates = auto_matching.rank_receivers(
+                db, db_lote, lote.ubicacion_lat, lote.ubicacion_lon, limit=5
+            )
+            for c in candidates:
+                # Notification is best-effort — missing SMTP config must not
+                # break the API. notifications module already swallows.
+                try:
+                    if c.contacto_email:
+                        notifications.notify_match_offered(
+                            c.contacto_email,
+                            c.receptor_nombre,
+                            db_lote.producto,
+                            db_lote.cantidad_kg,
+                            db_lote.id,
+                            c.distance_km,
+                        )
+                except Exception:
+                    pass
+        except Exception as e:
+            print(f"[create_lot] auto-match warn: {e}", flush=True)
 
         return db_to_lote_dict(db_lote)
     except Exception as e:
@@ -786,6 +861,114 @@ def get_lot(lot_id: int, db: Session = Depends(get_db)):
     return db_to_lote_dict(lote)
 
 
+# ==================== AUTO MATCHING (P0.1) ====================
+
+@app.post("/lots/{lot_id}/auto_match", response_model=models.AutoMatchResult, tags=["Lotes"])
+def auto_match_lot(
+    lot_id: int,
+    notify_top: int = Query(5, ge=0, le=20, description="Cuántos receptores top notificar por email"),
+    db: Session = Depends(get_db),
+):
+    """Rank receptors for a lot using the P0.1 scoring model and notify the
+    top N. This replaces the old Dutch-auction loop — the matching is
+    instantaneous and driven by:
+
+        score = (1 / max(distance_km + 0.5, 0.5))
+              * weight_factor(kg)
+              * urgency_factor(hours_to_expiry)
+              * priority_factor(receptor_tipo)
+
+    Priority order per VERDICT_BUSINESS_MODEL.md:
+    ONG / banco alimentos > transformador > piensos > biogás > compost.
+
+    Notification is best-effort (SMTP may be down — we don't 500 on that).
+    """
+    lote = db.query(database.LoteDB).filter(database.LoteDB.id == lot_id).first()
+    if not lote:
+        raise HTTPException(status_code=404, detail="Lote no encontrado")
+
+    lot_lat, lot_lon = parse_ubicacion(lote.ubicacion)
+    candidates = auto_matching.rank_receivers(db, lote, lot_lat, lot_lon, limit=20)
+
+    notified = 0
+    for c in candidates[:notify_top]:
+        try:
+            if c.contacto_email:
+                notifications.notify_match_offered(
+                    c.contacto_email,
+                    c.receptor_nombre,
+                    lote.producto,
+                    lote.cantidad_kg,
+                    lote.id,
+                    c.distance_km,
+                )
+                notified += 1
+        except Exception:
+            pass
+
+    categoria_val = lote.categoria.value if hasattr(lote.categoria, "value") else str(lote.categoria)
+    fallback = auto_matching.pick_fallback_receptor(db, categoria_val, lot_lat, lot_lon)
+
+    return models.AutoMatchResult(
+        lote_id=lote.id,
+        categoria=categoria_val,
+        matches=[
+            models.AutoMatchCandidate(
+                receptor_id=c.receptor_id,
+                receptor_nombre=c.receptor_nombre,
+                receptor_tipo=c.receptor_tipo,
+                distance_km=c.distance_km,
+                score=c.score,
+                priority_factor=c.priority_factor,
+                urgency_factor=c.urgency_factor,
+                weight_factor=c.weight_factor,
+            )
+            for c in candidates
+        ],
+        notified_top_n=notified,
+        fallback_available=fallback is not None,
+    )
+
+
+@app.post("/lots/{lot_id}/fallback", tags=["Lotes"])
+def fallback_lot(lot_id: int, db: Session = Depends(get_db)):
+    """Pick the fallback destination (pienso / biomasa / compost) when nobody
+    accepted the lot within the SLA window (default 24h). This is the
+    "disposal guarantee" — we commit to always finding a home, even if it's
+    a biogas plant.
+
+    Returns the chosen receptor + suggested outcome; the actual transaction
+    close still goes through POST /transactions.
+    """
+    lote = db.query(database.LoteDB).filter(database.LoteDB.id == lot_id).first()
+    if not lote:
+        raise HTTPException(status_code=404, detail="Lote no encontrado")
+
+    lot_lat, lot_lon = parse_ubicacion(lote.ubicacion)
+    categoria_val = lote.categoria.value if hasattr(lote.categoria, "value") else str(lote.categoria)
+    fb = auto_matching.pick_fallback_receptor(db, categoria_val, lot_lat, lot_lon)
+
+    if not fb:
+        raise HTTPException(
+            status_code=404,
+            detail="No hay receptor fallback disponible en el radio — alerta operativa."
+        )
+
+    outcome = auto_matching.TIPO_TO_OUTCOME.get(fb.receptor_tipo, "biomass_biogas")
+    return {
+        "lote_id": lote.id,
+        "categoria": categoria_val,
+        "fallback_receptor": {
+            "id": fb.receptor_id,
+            "nombre": fb.receptor_nombre,
+            "tipo": fb.receptor_tipo,
+            "distance_km": fb.distance_km,
+        },
+        "suggested_outcome": outcome,
+        "note": "Ejecutar POST /transactions con outcome y receptor_id de fallback para formalizar."
+    }
+
+
 # ==================== PUJA (BID) ENDPOINTS ====================
 
 @app.post("/bids", response_model=models.Puja, tags=["Pujas"])
@@ -855,20 +1038,12 @@ def create_bid(
         db.add(db_puja)
         db.commit()
 
-        # Update lot's dynamic price
-        num_bids = db.query(database.PujaDB).filter(
-            database.PujaDB.lote_id == lote.id
-        ).count()
-
-        lote.precio_actual = pricing.calculate_dynamic_price(
-            lote.precio_base,
-            lote.fecha_limite,
-            lote.fecha_publicacion,
-            num_bids=num_bids,
-            categoria=lote.categoria.value
-        )
-
-        db.commit()
+        # ---- Dutch auction KILLED (P0.1) ----
+        # precio_actual used to be recomputed via pricing.calculate_dynamic_price
+        # whenever a new bid arrived. It no longer is — the food price is
+        # whatever the generator set and stays there. The only thing that
+        # varies between transactions is the service/logistics fee SurplusAI
+        # charges, which lives on the Transaccion row, not here.
         db.refresh(db_puja)
 
         # Send notification to generator

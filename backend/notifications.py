@@ -82,6 +82,58 @@ def send_email(
         return False
 
 
+def notify_match_offered(
+    receptor_email: str,
+    receptor_name: str,
+    product: str,
+    quantity_kg: float,
+    lot_id: int,
+    distance_km: float,
+) -> bool:
+    """Notify a receptor that a new lot matches them (P0.1 auto-matching).
+
+    This is the outbound side of the matching engine: after ranking
+    receptors by (distance × weight × urgency × priority), we send the top N
+    a lightweight email so they can accept the lot in the portal. SMTP
+    failure is swallowed so the API request doesn't 500.
+    """
+    subject = f"SurplusAI: nuevo excedente asignado — {product} ({quantity_kg:.0f} kg)"
+    html_content = f"""
+    <html><body style="font-family:Arial,sans-serif;line-height:1.6;color:#333;">
+      <div style="max-width:600px;margin:0 auto;padding:20px;">
+        <h2 style="color:#1a5632;">Te hemos asignado un nuevo excedente</h2>
+        <p>Hola {receptor_name},</p>
+        <p>Acabamos de recibir un lote que encaja con tu perfil en SurplusAI.
+           El sistema de matching automático lo ha priorizado para ti.</p>
+        <div style="background:#f0fdf4;padding:15px;border-radius:8px;margin:20px 0;">
+          <p><strong>Detalles del lote #{lot_id}:</strong></p>
+          <ul>
+            <li>Producto: {product}</li>
+            <li>Cantidad: {quantity_kg:.0f} kg</li>
+            <li>Distancia estimada: {distance_km:.1f} km</li>
+          </ul>
+        </div>
+        <p>Tienes 2 horas para aceptarlo antes de que pasemos al siguiente receptor en la cola.</p>
+        <p style="margin-top:30px;font-size:0.9em;color:#666;">
+          Mensaje automático de SurplusAI. No respondas a este correo.
+        </p>
+      </div>
+    </body></html>
+    """
+    text_content = (
+        f"Hola {receptor_name}, tienes un nuevo lote asignado en SurplusAI:\n"
+        f"  - Producto: {product}\n"
+        f"  - Cantidad: {quantity_kg:.0f} kg\n"
+        f"  - Lote #{lot_id}\n"
+        f"  - Distancia: {distance_km:.1f} km\n\n"
+        f"Acepta en el portal en las próximas 2h."
+    )
+    try:
+        return send_email(receptor_email, subject, html_content, text_content)
+    except Exception:
+        return False
+
+
 def notify_match_found(
     generator_email: str,
     generator_name: str,

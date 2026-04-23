@@ -53,6 +53,21 @@ class EstadoTransaccion(str, Enum):
     cancelada = "cancelada"
 
 
+class OutcomeTransaccion(str, Enum):
+    """Where the surplus actually ended up.
+
+    This is the piece of data that matters for SurplusAI's disposal-guarantee
+    brand — it turns an unknown audit trail into a clean story for Ley 1/2025
+    inspectors and for ESG reports sold to customers.
+    """
+    donated_ong = "donated_ong"           # ONG / Cruz Roja / Cáritas (human consumption)
+    food_bank = "food_bank"               # Banco de alimentos (human consumption)
+    cattle_feed = "cattle_feed"           # Pienso — SANDACH / REGISTRO_PIENSOS
+    biomass_biogas = "biomass_biogas"     # Valorización biogás (lot → materia prima)
+    compost = "compost"                   # Compostaje aeróbico
+    energy_biogas = "energy_biogas"       # Digestor energético (vs materia-prima biogás)
+
+
 class UsoFinal(int, Enum):
     """Legal hierarchy per Ley 1/2025"""
     prevencion = 1
@@ -218,10 +233,20 @@ class TransaccionBase(BaseModel):
     cantidad_kg: float
     precio_final: float
     uso_final: UsoFinal
+    # New (v2 business model): split revenue streams explicitly so the
+    # dashboard can distinguish "GMV SurplusAI" (what we invoice) from
+    # "valor comida rescatada" (the price of the food itself, which is
+    # often €0 or symbolic).
+    service_fee_eur: Optional[float] = None    # tarifa gestión lote (€20–80)
+    logistics_fee_eur: Optional[float] = None  # €0.25/km, MIN €25 (P0.2)
+    biomass_revenue_eur: Optional[float] = None  # € cobrados a la planta biogás/compost
+    outcome: Optional[OutcomeTransaccion] = None
 
 
 class TransaccionCreate(TransaccionBase):
-    pass
+    distance_km: Optional[float] = None  # distance between generador and receptor,
+                                         # used to compute logistics_fee when the
+                                         # client doesn't pass one explicitly
 
 
 class Transaccion(TransaccionBase):
@@ -327,3 +352,35 @@ class MatchResponse(BaseModel):
     fecha_predicha: datetime
     confianza: float
     score_match: float
+
+
+# ---- Automatic matching (P0.1) ----
+class AutoMatchCandidate(BaseModel):
+    receptor_id: int
+    receptor_nombre: str
+    receptor_tipo: str
+    distance_km: float
+    score: float
+    priority_factor: float
+    urgency_factor: float
+    weight_factor: float
+
+
+class AutoMatchResult(BaseModel):
+    lote_id: int
+    categoria: str
+    matches: List[AutoMatchCandidate]
+    notified_top_n: int
+    fallback_available: bool
+
+
+# ---- Subscription plans (P0.5) ----
+class SubscriptionPlan(BaseModel):
+    id: int
+    name: str
+    price_monthly_eur: float
+    max_lots_month: Optional[int] = None
+    includes: Dict[str, Any]
+
+    class Config:
+        from_attributes = True
