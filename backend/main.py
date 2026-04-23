@@ -10,6 +10,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from typing import List, Optional
+import math
 import os
 import re
 from dotenv import load_dotenv
@@ -201,16 +202,38 @@ def get_current_user_info(
 # ==================== HELPERS ====================
 
 def parse_ubicacion(ubicacion) -> tuple:
-    """Parse location from DB (POINT string or WKBElement) to (lat, lon)"""
+    """Parse location from DB (POINT string, "lat,lon" string, or WKBElement) to (lat, lon).
+
+    Tolerates three storage formats:
+      * ``POINT(lon lat)`` — what the create endpoints write when PostGIS is off.
+      * ``"lat,lon"`` — what some seed data / fixtures use.
+      * ``WKBElement`` — what PostGIS hands back when ``USE_POSTGIS=true``.
+    """
     if ubicacion is None:
         return 0.0, 0.0
     if isinstance(ubicacion, str):
-        # "POINT(lon lat)" format
-        try:
-            coords = ubicacion.replace("POINT(", "").replace(")", "").strip().split()
-            return float(coords[1]), float(coords[0])
-        except (IndexError, ValueError):
-            return 0.0, 0.0
+        s = ubicacion.strip()
+        # "POINT(lon lat)" format (note: PostGIS order is lon, lat)
+        if s.upper().startswith("POINT"):
+            try:
+                coords = (
+                    s.replace("POINT(", "")
+                    .replace("POINT (", "")
+                    .replace(")", "")
+                    .strip()
+                    .split()
+                )
+                return float(coords[1]), float(coords[0])
+            except (IndexError, ValueError):
+                return 0.0, 0.0
+        # "lat,lon" format
+        if "," in s:
+            try:
+                parts = s.split(",")
+                return float(parts[0].strip()), float(parts[1].strip())
+            except (IndexError, ValueError):
+                return 0.0, 0.0
+        return 0.0, 0.0
     # GeoAlchemy2 WKBElement - try to extract coords
     try:
         from geoalchemy2.shape import to_shape
@@ -218,6 +241,33 @@ def parse_ubicacion(ubicacion) -> tuple:
         return point.y, point.x
     except Exception:
         return 0.0, 0.0
+
+
+def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Great-circle distance between two lat/lon points in kilometres."""
+    R = 6371.0088  # Earth mean radius (km)
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2.0) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2.0) ** 2
+    return 2.0 * R * math.asin(min(1.0, math.sqrt(a)))
+
+
+def logistics_radius_cap_km(max_weight_kg: Optional[float]) -> Optional[float]:
+    """Return the logistics-aware default radius for a weight tier.
+
+    Small lots (<50 kg) are only viable within a small radius because the
+    transport cost dominates. Medium lots (50–500 kg) justify regional
+    shipping. Large lots (>500 kg) can travel nationally.
+    """
+    if max_weight_kg is None:
+        return None
+    if max_weight_kg < 50:
+        return 25.0
+    if max_weight_kg <= 500:
+        return 100.0
+    return 2000.0  # effectively uncapped (Iberia diagonal is ~1100 km)
 
 
 def db_to_generador_dict(g) -> dict:
@@ -577,6 +627,149 @@ def list_lots(
         ))
 
     return result
+
+
+@app.get("/lots/nearby", tags=["Lotes"])
+def lots_nearby(
+    lat: float = Query(..., ge=-90, le=90, description="Latitud del receptor"),
+    lon: float = Query(..., ge=-180, le=180, description="Longitud del receptor"),
+    radius_km: Optional[float] = Query(
+        None, gt=0, le=5000,
+        description="Radio de búsqueda en km. Si se omite, se usa el cap logístico por peso (25/100/2000)."
+    ),
+    max_weight_kg: Optional[float] = Query(
+        None, gt=0,
+        description="Peso máximo del lote. <50=pequeño, 50-500=mediano, >500=grande."
+    ),
+    category: Optional[models.Categoria] = Query(None, description="Filtrar por categoría"),
+    limit: int = Query(100, ge=1, le=500, description="Máximo de lotes a devolver"),
+    db: Session = Depends(get_db),
+):
+    """Return active lots close to ``(lat, lon)``, sorted by distance ascending.
+
+    Logistics-aware defaults:
+
+    * ``max_weight_kg < 50``  → radius cap **25 km** (lotes pequeños, transporte inviable más lejos)
+    * ``50 ≤ kg ≤ 500``       → radius cap **100 km** (lotes medianos)
+    * ``kg > 500``            → sin cap efectivo (nacional)
+
+    If ``radius_km`` is omitted, the cap above is used; otherwise both are
+    honoured and the smaller of the two applies. When neither is provided
+    the default radius is 50 km.
+
+    Uses PostGIS ``ST_DWithin`` when ``USE_POSTGIS=true``, otherwise computes
+    great-circle distance in Python (works on SQLite and vanilla Postgres).
+    """
+    # 1. Resolve effective radius
+    weight_cap = logistics_radius_cap_km(max_weight_kg)
+    if radius_km is None:
+        effective_radius = weight_cap if weight_cap is not None else 50.0
+    else:
+        effective_radius = radius_km
+        if weight_cap is not None and effective_radius > weight_cap:
+            effective_radius = weight_cap
+
+    # 2. Base query — active lots joined to generator for name/contact
+    query = (
+        db.query(database.LoteDB, database.GeneradorDB)
+        .join(
+            database.GeneradorDB,
+            database.LoteDB.generador_id == database.GeneradorDB.id,
+        )
+        .filter(database.LoteDB.estado == models.EstadoLote.activo)
+    )
+    if category is not None:
+        query = query.filter(database.LoteDB.categoria == category)
+    if max_weight_kg is not None:
+        query = query.filter(database.LoteDB.cantidad_kg <= max_weight_kg)
+
+    # 3. PostGIS fast-path (SQL-side ST_DWithin + ORDER BY distance)
+    rows = None
+    use_postgis = getattr(database, "USE_POSTGIS", False) and database.Geometry is not None
+    if use_postgis:
+        try:
+            from geoalchemy2 import func as gf
+            point = gf.ST_SetSRID(gf.ST_MakePoint(lon, lat), 4326)
+            geog_lot = database.LoteDB.ubicacion.cast("geography")
+            geog_point = point.cast("geography")
+            distance_m = gf.ST_Distance(geog_lot, geog_point)
+            rows = (
+                query.filter(gf.ST_DWithin(geog_lot, geog_point, effective_radius * 1000.0))
+                .order_by(distance_m.asc())
+                .limit(limit)
+                .all()
+            )
+        except Exception:
+            rows = None  # fall through to Python path
+
+    # 4. Python fallback — haversine over all candidates
+    results = []
+    if rows is None:
+        for lote, gen in query.all():
+            lat_l, lon_l = parse_ubicacion(lote.ubicacion)
+            if lat_l == 0.0 and lon_l == 0.0:
+                continue  # can't geolocate this lot
+            d_km = haversine_km(lat, lon, lat_l, lon_l)
+            if d_km > effective_radius:
+                continue
+            results.append((lote, gen, lat_l, lon_l, d_km))
+        results.sort(key=lambda r: r[4])
+        results = results[:limit]
+    else:
+        for lote, gen in rows:
+            lat_l, lon_l = parse_ubicacion(lote.ubicacion)
+            d_km = haversine_km(lat, lon, lat_l, lon_l) if (lat_l or lon_l) else 0.0
+            results.append((lote, gen, lat_l, lon_l, d_km))
+
+    # 5. Build response with bid counts + distance
+    lots_out = []
+    for lote, gen, lat_l, lon_l, d_km in results:
+        num_bids = (
+            db.query(database.PujaDB)
+            .filter(database.PujaDB.lote_id == lote.id)
+            .count()
+        )
+        categoria_val = lote.categoria.value if hasattr(lote.categoria, "value") else str(lote.categoria)
+        estado_val = lote.estado.value if hasattr(lote.estado, "value") else str(lote.estado)
+        lots_out.append({
+            "id": lote.id,
+            "generador_id": lote.generador_id,
+            "generador_nombre": gen.nombre,
+            "producto": lote.producto,
+            "categoria": categoria_val,
+            "cantidad_kg": lote.cantidad_kg,
+            "ubicacion_lat": lat_l,
+            "ubicacion_lon": lon_l,
+            "fecha_publicacion": lote.fecha_publicacion.isoformat() if lote.fecha_publicacion else None,
+            "fecha_limite": lote.fecha_limite.isoformat() if lote.fecha_limite else None,
+            "precio_base": lote.precio_base,
+            "precio_actual": lote.precio_actual,
+            "temperatura_conservacion": lote.temperatura_conservacion,
+            "estado": estado_val,
+            "num_bids": num_bids,
+            "distancia_km": round(d_km, 2),
+        })
+
+    return {
+        "query": {
+            "lat": lat,
+            "lon": lon,
+            "radius_km": effective_radius,
+            "radius_km_requested": radius_km,
+            "max_weight_kg": max_weight_kg,
+            "weight_tier": (
+                "pequeno" if (max_weight_kg is not None and max_weight_kg < 50)
+                else "mediano" if (max_weight_kg is not None and max_weight_kg <= 500)
+                else "grande" if max_weight_kg is not None
+                else None
+            ),
+            "category": category.value if category else None,
+            "limit": limit,
+            "engine": "postgis" if (use_postgis and rows is not None) else "haversine",
+        },
+        "count": len(lots_out),
+        "lots": lots_out,
+    }
 
 
 @app.get("/lots/{lot_id}", response_model=models.Lote, tags=["Lotes"])
