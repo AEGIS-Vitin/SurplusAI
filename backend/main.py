@@ -1113,14 +1113,47 @@ async def root_redirect():
 # Mount the static SPA at /app so the same container serves both API and UI.
 # This keeps the deploy single-service (Railway / any PaaS) without a separate
 # nginx box. Register this LAST so /docs, /health, /auth/*, etc. still resolve.
-_frontend_path = os.path.join(os.path.dirname(__file__), "..", "frontend")
-_frontend_path = os.path.abspath(_frontend_path)
-if os.path.isdir(_frontend_path):
+#
+# Path resolution is tolerant: we search common container layouts because
+# different deploy targets (Railway Dockerfile, Nixpacks, local dev) put the
+# frontend dir in different absolute locations.
+_candidate_frontend_paths = [
+    os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend")),
+    "/frontend",
+    "/app/frontend",
+    os.path.abspath(os.path.join(os.getcwd(), "frontend")),
+    os.path.abspath(os.path.join(os.getcwd(), "..", "frontend")),
+]
+_frontend_path = None
+for _p in _candidate_frontend_paths:
+    if os.path.isdir(_p) and os.path.isfile(os.path.join(_p, "index.html")):
+        _frontend_path = _p
+        break
+
+if _frontend_path:
+    print(f"[frontend] mounting {_frontend_path} at /app", flush=True)
     app.mount(
         "/app",
         StaticFiles(directory=_frontend_path, html=True),
         name="frontend",
     )
+else:
+    print(f"[frontend] WARNING: no frontend dir found. Tried: {_candidate_frontend_paths}", flush=True)
+
+
+@app.get("/_debug/frontend", include_in_schema=False)
+async def _debug_frontend():
+    """Diagnostic: reports what frontend path is mounted and what's at the common candidates."""
+    info = {
+        "cwd": os.getcwd(),
+        "__file__": __file__,
+        "mounted_path": _frontend_path,
+        "candidates": [
+            {"path": p, "is_dir": os.path.isdir(p), "has_index": os.path.isfile(os.path.join(p, "index.html"))}
+            for p in _candidate_frontend_paths
+        ],
+    }
+    return info
 
 
 if __name__ == "__main__":
