@@ -3,115 +3,519 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SurplusAI — Marketplace B2B de Excedentes Alimentarios</title>
-    <meta name="description" content="Marketplace B2B inteligente para excedentes alimentarios. Cumplimiento Ley 1/2025. Conecta generadores y receptores con IA.">
+    <title>SurplusAI - Marketplace B2B de Excedentes Alimentarios | Cumple la Ley 1/2025</title>
+    <meta name="description" content="Marketplace B2B inteligente para excedentes alimentarios. Cumplimiento Ley 1/2025 de prevención de pérdidas y desperdicio alimentario. Conecta generadores y receptores con IA.">
+    <meta name="keywords" content="excedentes alimentarios, desperdicio alimentario, Ley 1/2025, marketplace B2B, surplus food, food waste Spain">
+    <meta property="og:title" content="SurplusAI - Marketplace B2B de Excedentes Alimentarios">
+    <meta property="og:description" content="Reduce el desperdicio alimentario y cumple la Ley 1/2025. Marketplace B2B con inteligencia artificial.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://www.surplusai.es">
+    <link rel="canonical" href="https://www.surplusai.es">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- Leaflet (OpenStreetMap tiles, no API key, MIT) + markercluster (MIT) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" crossorigin="">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" crossorigin="">
+    <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script defer src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" crossorigin=""></script>
     <style>
         :root {
             --primary: #1a5632;
             --primary-light: #22763e;
             --primary-dark: #0f3a20;
+            --primary-50: #f0fdf4;
+            --primary-100: #dcfce7;
             --secondary: #f59e0b;
             --secondary-light: #fbbf24;
+            --secondary-dark: #d97706;
             --bg: #f8fafc;
-            --card-shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 12px rgba(0,0,0,.04);
-            --card-hover: 0 4px 20px rgba(0,0,0,.12);
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --card-shadow: 0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.04);
+            --card-hover: 0 8px 30px rgba(26,86,50,.12);
+            --transition: all .25s cubic-bezier(.4,0,.2,1);
         }
-        * { box-sizing: border-box; }
-        body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: #1e293b; }
+
+        *, *::before, *::after { box-sizing: border-box; }
+
         html { scroll-behavior: smooth; }
-        section { scroll-margin-top: 72px; }
 
-        /* ========== Navbar ========== */
-        .nav-main { background: rgba(255,255,255,.95); backdrop-filter: blur(12px); border-bottom: 1px solid #e2e8f0; }
-        .nav-main .navbar-brand { font-weight: 800; color: var(--primary); font-size: 1.35rem; letter-spacing: -.5px; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        section { scroll-margin-top: 76px; }
+
+        /* ======== Animations ======== */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes countUp {
+            from { opacity: 0; transform: scale(.8); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .6; }
+        }
+        .fade-in-up {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity .6s ease-out, transform .6s ease-out;
+        }
+        .fade-in-up.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* ======== Navbar ======== */
+        .nav-main {
+            background: rgba(255,255,255,.92);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border-bottom: 1px solid rgba(226,232,240,.8);
+            z-index: 1030;
+            transition: var(--transition);
+        }
+        .nav-main.scrolled {
+            box-shadow: 0 4px 20px rgba(0,0,0,.06);
+        }
+        .nav-main .navbar-brand {
+            font-weight: 800;
+            color: var(--primary);
+            font-size: 1.45rem;
+            letter-spacing: -.5px;
+        }
         .nav-main .navbar-brand span { color: var(--secondary); }
-        .nav-main .nav-link { color: #475569; font-weight: 500; padding: .5rem 1rem !important; border-radius: .5rem; transition: all .15s; }
-        .nav-main .nav-link:hover, .nav-main .nav-link.active { color: var(--primary); background: #f0fdf4; }
+        .nav-main .nav-link {
+            color: #475569;
+            font-weight: 500;
+            font-size: .92rem;
+            padding: .5rem .85rem !important;
+            border-radius: .5rem;
+            transition: var(--transition);
+            position: relative;
+        }
+        .nav-main .nav-link:hover,
+        .nav-main .nav-link.active {
+            color: var(--primary);
+            background: var(--primary-50);
+        }
+        .nav-main .nav-link.active::after {
+            content: '';
+            position: absolute;
+            bottom: 2px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 20px;
+            height: 3px;
+            background: var(--primary);
+            border-radius: 2px;
+        }
 
-        /* ========== Buttons ========== */
-        .btn-primary-custom { background: var(--primary); color: #fff; border: none; border-radius: .5rem; padding: .5rem 1.25rem; font-weight: 600; transition: all .2s; }
-        .btn-primary-custom:hover { background: var(--primary-light); color: #fff; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(26,86,50,.3); }
-        .btn-secondary-custom { background: var(--secondary); color: #fff; border: none; border-radius: .5rem; padding: .5rem 1.25rem; font-weight: 600; transition: all .2s; }
-        .btn-secondary-custom:hover { background: var(--secondary-light); color: #fff; transform: translateY(-1px); }
-        .btn-outline-custom { border: 2px solid var(--primary); color: var(--primary); background: transparent; border-radius: .5rem; padding: .45rem 1.2rem; font-weight: 600; transition: all .15s; }
-        .btn-outline-custom:hover { background: var(--primary); color: #fff; }
+        /* ======== Buttons ======== */
+        .btn-primary-custom {
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            border-radius: .6rem;
+            padding: .55rem 1.35rem;
+            font-weight: 600;
+            font-size: .92rem;
+            transition: var(--transition);
+        }
+        .btn-primary-custom:hover {
+            background: var(--primary-light);
+            color: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(26,86,50,.25);
+        }
+        .btn-secondary-custom {
+            background: var(--secondary);
+            color: #fff;
+            border: none;
+            border-radius: .6rem;
+            padding: .55rem 1.35rem;
+            font-weight: 600;
+            font-size: .92rem;
+            transition: var(--transition);
+        }
+        .btn-secondary-custom:hover {
+            background: var(--secondary-dark);
+            color: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(245,158,11,.25);
+        }
+        .btn-outline-custom {
+            border: 2px solid var(--primary);
+            color: var(--primary);
+            background: transparent;
+            border-radius: .6rem;
+            padding: .5rem 1.3rem;
+            font-weight: 600;
+            font-size: .92rem;
+            transition: var(--transition);
+        }
+        .btn-outline-custom:hover {
+            background: var(--primary);
+            color: #fff;
+            transform: translateY(-2px);
+        }
+        .btn-outline-light-custom {
+            border: 2px solid rgba(255,255,255,.5);
+            color: #fff;
+            background: transparent;
+            border-radius: .6rem;
+            padding: .5rem 1.3rem;
+            font-weight: 600;
+            font-size: .92rem;
+            transition: var(--transition);
+        }
+        .btn-outline-light-custom:hover {
+            background: rgba(255,255,255,.15);
+            color: #fff;
+            border-color: #fff;
+            transform: translateY(-2px);
+        }
 
-        /* ========== Hero ========== */
+        /* ======== Hero ======== */
         .hero {
-            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 50%, #22763e 100%);
-            color: #fff; padding: 5rem 0 4rem; position: relative; overflow: hidden;
+            background: linear-gradient(135deg, #0a2e1a 0%, var(--primary-dark) 25%, var(--primary) 55%, #1e7a42 100%);
+            color: #fff;
+            padding: 6rem 0 5rem;
+            position: relative;
+            overflow: hidden;
         }
         .hero::before {
-            content: ''; position: absolute; top: -40%; right: -15%; width: 700px; height: 700px;
-            background: radial-gradient(circle, rgba(245,158,11,.12) 0%, transparent 70%); pointer-events: none;
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -20%;
+            width: 900px;
+            height: 900px;
+            background: radial-gradient(circle, rgba(245,158,11,.08) 0%, transparent 65%);
+            pointer-events: none;
         }
         .hero::after {
-            content: ''; position: absolute; bottom: -30%; left: -10%; width: 500px; height: 500px;
-            background: radial-gradient(circle, rgba(255,255,255,.04) 0%, transparent 70%); pointer-events: none;
+            content: '';
+            position: absolute;
+            bottom: -40%;
+            left: -15%;
+            width: 700px;
+            height: 700px;
+            background: radial-gradient(circle, rgba(255,255,255,.03) 0%, transparent 65%);
+            pointer-events: none;
         }
-        .hero h1 { font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 800; line-height: 1.1; letter-spacing: -1px; }
-        .hero .lead { font-size: 1.15rem; opacity: .9; max-width: 540px; }
-        .hero-stats { display: flex; gap: 2rem; flex-wrap: wrap; margin-top: 2.5rem; }
-        .hero-stat { text-align: center; }
-        .hero-stat .num { font-size: 2rem; font-weight: 800; color: var(--secondary); line-height: 1.2; }
-        .hero-stat .label { font-size: .82rem; opacity: .8; }
+        .hero-pattern {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.02'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+            pointer-events: none;
+        }
+        .hero h1 {
+            font-size: clamp(2.2rem, 5vw, 3.6rem);
+            font-weight: 800;
+            line-height: 1.08;
+            letter-spacing: -1.5px;
+        }
+        .hero h1 .text-amber { color: var(--secondary-light); }
+        .hero .lead {
+            font-size: 1.15rem;
+            opacity: .88;
+            max-width: 560px;
+            line-height: 1.7;
+        }
+        .hero-stats {
+            display: flex;
+            gap: 2rem;
+            flex-wrap: wrap;
+            margin-top: 2.5rem;
+        }
+        .hero-stat { text-align: center; min-width: 90px; }
+        .hero-stat .num {
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: var(--secondary-light);
+            line-height: 1.1;
+            animation: countUp .6s ease-out;
+        }
+        .hero-stat .label {
+            font-size: .8rem;
+            opacity: .7;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            margin-top: .2rem;
+        }
         .badge-ley {
-            background: rgba(245,158,11,.18); color: var(--secondary-light);
-            border: 1px solid rgba(245,158,11,.3); font-size: .8rem;
-            padding: .35rem .75rem; border-radius: 2rem; display: inline-block;
+            background: rgba(245,158,11,.15);
+            color: var(--secondary-light);
+            border: 1px solid rgba(245,158,11,.25);
+            font-size: .82rem;
+            padding: .4rem .9rem;
+            border-radius: 2rem;
+            display: inline-flex;
+            align-items: center;
+            gap: .4rem;
+            font-weight: 600;
         }
-        .hero-visual { font-size: 10rem; opacity: .08; line-height: 1; }
-        @media (max-width: 768px) { .hero { padding: 3rem 0 2.5rem; } .hero-visual { display: none; } }
+        .hero-illustration {
+            position: relative;
+        }
+        .hero-illustration .floating-card {
+            background: rgba(255,255,255,.1);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,.12);
+            border-radius: 1rem;
+            padding: 1.2rem 1.5rem;
+            margin-bottom: 1rem;
+            animation: fadeInUp .8s ease-out backwards;
+        }
+        .hero-illustration .floating-card:nth-child(2) { animation-delay: .2s; }
+        .hero-illustration .floating-card:nth-child(3) { animation-delay: .4s; }
+        .hero-illustration .floating-card .fc-icon {
+            width: 40px; height: 40px;
+            border-radius: .6rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+        }
 
-        /* ========== Section Headings ========== */
-        .section-title { font-weight: 800; color: var(--primary-dark); font-size: 1.8rem; letter-spacing: -.5px; }
-        .section-subtitle { color: #64748b; font-size: 1rem; }
+        @media (max-width: 991px) {
+            .hero { padding: 4rem 0 3rem; }
+            .hero-illustration { display: none; }
+        }
 
-        /* ========== Stat Cards ========== */
+        /* ======== Compliance Banner ======== */
+        .compliance-section {
+            background: linear-gradient(90deg, #fef3c7 0%, #fde68a 50%, #fef3c7 100%);
+            padding: 1rem 0;
+            border-bottom: 2px solid #fbbf24;
+        }
+        .compliance-section .badge-compliance {
+            display: inline-flex;
+            align-items: center;
+            gap: .5rem;
+            background: #fff;
+            padding: .4rem 1rem;
+            border-radius: 2rem;
+            font-weight: 700;
+            color: var(--primary);
+            font-size: .82rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,.06);
+        }
+        .compliance-section p {
+            color: #92400e;
+            font-size: .88rem;
+            font-weight: 500;
+        }
+
+        /* ======== Section Headings ======== */
+        .section-title {
+            font-weight: 800;
+            color: var(--primary-dark);
+            font-size: 2rem;
+            letter-spacing: -.8px;
+            line-height: 1.2;
+        }
+        .section-subtitle {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+            max-width: 600px;
+        }
+        .section-divider {
+            width: 60px;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            border-radius: 2px;
+            margin-top: .75rem;
+        }
+
+        /* ======== How it works ======== */
+        .step-card {
+            text-align: center;
+            padding: 2rem 1.5rem;
+            border-radius: 1.2rem;
+            background: #fff;
+            border: 1px solid var(--border);
+            box-shadow: var(--card-shadow);
+            transition: var(--transition);
+            position: relative;
+            height: 100%;
+        }
+        .step-card:hover {
+            box-shadow: var(--card-hover);
+            transform: translateY(-4px);
+        }
+        .step-number {
+            position: absolute;
+            top: -16px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 32px;
+            height: 32px;
+            background: var(--primary);
+            color: #fff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: .85rem;
+        }
+        .step-icon {
+            width: 72px;
+            height: 72px;
+            border-radius: 1.2rem;
+            margin: .5rem auto 1.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+        }
+        .step-arrow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary);
+            font-size: 1.5rem;
+            opacity: .3;
+        }
+
+        /* ======== Stat Cards ======== */
         .stat-card {
-            background: #fff; border-radius: 1rem; padding: 1.5rem;
-            box-shadow: var(--card-shadow); transition: all .2s; border: 1px solid #e2e8f0;
+            background: #fff;
+            border-radius: 1rem;
+            padding: 1.4rem;
+            box-shadow: var(--card-shadow);
+            transition: var(--transition);
+            border: 1px solid var(--border);
+            height: 100%;
         }
-        .stat-card:hover { box-shadow: var(--card-hover); transform: translateY(-2px); }
+        .stat-card:hover {
+            box-shadow: var(--card-hover);
+            transform: translateY(-2px);
+        }
         .stat-icon {
-            width: 48px; height: 48px; border-radius: .75rem;
-            display: flex; align-items: center; justify-content: center; font-size: 1.3rem;
+            width: 48px;
+            height: 48px;
+            border-radius: .85rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
         }
-        .stat-card .value { font-size: 1.75rem; font-weight: 800; color: #0f172a; line-height: 1.2; }
-        .stat-card .label { font-size: .82rem; color: #64748b; }
+        .stat-card .value {
+            font-size: 1.7rem;
+            font-weight: 800;
+            color: #0f172a;
+            line-height: 1.2;
+        }
+        .stat-card .label {
+            font-size: .8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: .3px;
+        }
 
-        /* ========== Chart Card ========== */
+        /* ======== Chart Card ======== */
         .chart-card {
-            background: #fff; border-radius: 1rem; padding: 1.5rem;
-            box-shadow: var(--card-shadow); border: 1px solid #e2e8f0;
+            background: #fff;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            box-shadow: var(--card-shadow);
+            border: 1px solid var(--border);
+            height: 100%;
         }
 
-        /* ========== Lot Cards ========== */
+        /* ======== Lot Cards ======== */
         .lot-card {
-            background: #fff; border-radius: 1rem; box-shadow: var(--card-shadow);
-            border: 1px solid #e2e8f0; overflow: hidden; transition: all .2s;
-            cursor: pointer; height: 100%; display: flex; flex-direction: column;
+            background: #fff;
+            border-radius: 1rem;
+            box-shadow: var(--card-shadow);
+            border: 1px solid var(--border);
+            overflow: hidden;
+            transition: var(--transition);
+            cursor: pointer;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
         }
-        .lot-card:hover { box-shadow: var(--card-hover); transform: translateY(-3px); }
-        .lot-card-header { padding: 1.25rem 1.25rem .75rem; display: flex; justify-content: space-between; align-items: flex-start; }
-        .lot-card-body { padding: 0 1.25rem 1rem; flex: 1; }
+        .lot-card:hover {
+            box-shadow: var(--card-hover);
+            transform: translateY(-4px);
+            border-color: rgba(26,86,50,.15);
+        }
+        .lot-card-header {
+            padding: 1.25rem 1.25rem .75rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .lot-card-body {
+            padding: 0 1.25rem 1rem;
+            flex: 1;
+        }
         .lot-card-footer {
-            padding: .75rem 1.25rem; background: #f8fafc; border-top: 1px solid #f1f5f9;
-            display: flex; justify-content: space-between; align-items: center;
+            padding: .85rem 1.25rem;
+            background: var(--primary-50);
+            border-top: 1px solid #dcfce7;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
-        .lot-price { font-size: 1.35rem; font-weight: 800; color: var(--primary); }
-        .lot-price small { font-size: .72rem; font-weight: 500; color: #64748b; }
-        .lot-meta { display: flex; gap: .75rem; flex-wrap: wrap; margin-top: .5rem; }
-        .lot-meta-item { font-size: .8rem; color: #64748b; display: flex; align-items: center; gap: .25rem; }
-        .time-badge { font-size: .78rem; font-weight: 600; }
+        .lot-price {
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: var(--primary);
+        }
+        .lot-price small {
+            font-size: .7rem;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+        .lot-meta {
+            display: flex;
+            gap: .7rem;
+            flex-wrap: wrap;
+            margin-top: .5rem;
+        }
+        .lot-meta-item {
+            font-size: .78rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: .25rem;
+        }
+        .time-badge {
+            font-size: .78rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: .25rem;
+        }
         .time-badge.urgent { color: #ef4444; }
         .time-badge.ok { color: var(--primary); }
 
-        /* ========== Category Badges ========== */
-        .cat-badge { font-size: .72rem; font-weight: 600; padding: .25rem .65rem; border-radius: 2rem; display: inline-flex; align-items: center; gap: .3rem; }
+        /* ======== Category Badges ======== */
+        .cat-badge {
+            font-size: .72rem;
+            font-weight: 600;
+            padding: .25rem .7rem;
+            border-radius: 2rem;
+            display: inline-flex;
+            align-items: center;
+            gap: .3rem;
+            letter-spacing: .2px;
+        }
         .cat-frutas { background: #dcfce7; color: #166534; }
         .cat-verduras { background: #d1fae5; color: #065f46; }
         .cat-lacteos { background: #dbeafe; color: #1e40af; }
@@ -121,89 +525,390 @@
         .cat-prepared { background: #f3e8ff; color: #6b21a8; }
         .cat-otros { background: #f1f5f9; color: #475569; }
 
-        /* ========== Bid Cards ========== */
-        .bid-card {
-            background: #f8fafc; border: 1px solid #e2e8f0;
-            border-radius: .75rem; padding: 1rem; margin-bottom: .75rem;
+        /* ======== Status Badges ======== */
+        .status-badge {
+            font-size: .72rem;
+            font-weight: 600;
+            padding: .2rem .6rem;
+            border-radius: 1rem;
         }
+        .status-activo { background: #dcfce7; color: #166534; }
+        .status-adjudicado { background: #dbeafe; color: #1e40af; }
+        .status-expirado { background: #fee2e2; color: #991b1b; }
+        .status-completado { background: #d1fae5; color: #065f46; }
+
+        /* ======== Bid Cards ======== */
+        .bid-card {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: .75rem;
+            padding: 1rem;
+            margin-bottom: .75rem;
+            transition: var(--transition);
+        }
+        .bid-card:hover { border-color: rgba(26,86,50,.2); }
         .bid-card .bid-price { font-weight: 700; color: var(--primary); font-size: 1.1rem; }
         .bid-status { font-size: .72rem; padding: .2rem .55rem; border-radius: 1rem; font-weight: 600; }
         .bid-pendiente { background: #fef3c7; color: #92400e; }
         .bid-aceptada { background: #dcfce7; color: #166534; }
         .bid-rechazada { background: #fee2e2; color: #991b1b; }
 
-        /* ========== Modals ========== */
-        .modal-content { border: none; border-radius: 1rem; }
-        .modal-header { border-bottom: 1px solid #f1f5f9; }
-        .modal-footer { border-top: 1px solid #f1f5f9; }
-        .auth-tabs .nav-link { color: #64748b; font-weight: 600; border: none; border-radius: 0; }
-        .auth-tabs .nav-link.active { color: var(--primary); border-bottom: 3px solid var(--primary); background: transparent; }
-        .form-control:focus, .form-select:focus { border-color: var(--primary); box-shadow: 0 0 0 .2rem rgba(26,86,50,.15); }
+        /* ======== Pricing ======== */
+        .pricing-card {
+            background: #fff;
+            border-radius: 1.2rem;
+            padding: 2.5rem 2rem;
+            box-shadow: var(--card-shadow);
+            border: 2px solid var(--border);
+            transition: var(--transition);
+            height: 100%;
+            position: relative;
+        }
+        .pricing-card:hover {
+            box-shadow: var(--card-hover);
+            transform: translateY(-4px);
+        }
+        .pricing-card.featured {
+            border-color: var(--primary);
+            box-shadow: 0 8px 40px rgba(26,86,50,.15);
+        }
+        .pricing-card.featured::before {
+            content: 'Recomendado';
+            position: absolute;
+            top: -14px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--primary);
+            color: #fff;
+            padding: .3rem 1.2rem;
+            border-radius: 2rem;
+            font-size: .75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+        }
+        .pricing-card .price {
+            font-size: 2.8rem;
+            font-weight: 800;
+            color: var(--primary-dark);
+            line-height: 1;
+        }
+        .pricing-card .price small {
+            font-size: .9rem;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+        .pricing-card .feature-list {
+            list-style: none;
+            padding: 0;
+            margin: 1.5rem 0;
+        }
+        .pricing-card .feature-list li {
+            padding: .45rem 0;
+            font-size: .88rem;
+            color: #475569;
+            display: flex;
+            align-items: center;
+            gap: .5rem;
+        }
+        .pricing-card .feature-list li i {
+            color: var(--primary);
+            font-size: .8rem;
+            flex-shrink: 0;
+        }
+        .pricing-card .feature-list li.disabled {
+            color: #cbd5e1;
+        }
+        .pricing-card .feature-list li.disabled i {
+            color: #cbd5e1;
+        }
 
-        /* ========== Utilities ========== */
-        .spinner-overlay { display: flex; align-items: center; justify-content: center; padding: 3rem; }
+        /* ======== Testimonials ======== */
+        .testimonial-card {
+            background: #fff;
+            border-radius: 1.2rem;
+            padding: 2rem;
+            box-shadow: var(--card-shadow);
+            border: 1px solid var(--border);
+            transition: var(--transition);
+            height: 100%;
+        }
+        .testimonial-card:hover {
+            box-shadow: var(--card-hover);
+            transform: translateY(-3px);
+        }
+        .testimonial-card .stars { color: var(--secondary); font-size: .85rem; }
+        .testimonial-card .quote {
+            font-size: .95rem;
+            line-height: 1.7;
+            color: #475569;
+            font-style: italic;
+        }
+        .testimonial-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        /* ======== Law section ======== */
+        .law-card {
+            background: #fff;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            border: 1px solid var(--border);
+            box-shadow: var(--card-shadow);
+            transition: var(--transition);
+            height: 100%;
+        }
+        .law-card:hover {
+            box-shadow: var(--card-hover);
+            transform: translateY(-2px);
+        }
+        .penalty-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: .4rem;
+            background: #fee2e2;
+            color: #991b1b;
+            padding: .4rem .9rem;
+            border-radius: 2rem;
+            font-weight: 700;
+            font-size: .85rem;
+        }
+
+        /* ======== Contact ======== */
+        .contact-card {
+            background: #fff;
+            border-radius: 1.2rem;
+            padding: 2rem;
+            box-shadow: var(--card-shadow);
+            border: 1px solid var(--border);
+        }
+
+        /* ======== Modals ======== */
+        .modal-content {
+            border: none;
+            border-radius: 1.2rem;
+            box-shadow: 0 25px 60px rgba(0,0,0,.15);
+        }
+        .modal-header {
+            border-bottom: 1px solid #f1f5f9;
+            padding: 1.2rem 1.5rem;
+        }
+        .modal-footer { border-top: 1px solid #f1f5f9; }
+        .auth-tabs .nav-link {
+            color: var(--text-muted);
+            font-weight: 600;
+            border: none;
+            border-radius: 0;
+            padding: .6rem 1.2rem;
+            transition: var(--transition);
+        }
+        .auth-tabs .nav-link.active {
+            color: var(--primary);
+            border-bottom: 3px solid var(--primary);
+            background: transparent;
+        }
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 .2rem rgba(26,86,50,.12);
+        }
+        .form-control, .form-select {
+            border-radius: .5rem;
+            padding: .55rem .85rem;
+            border: 1px solid #d1d5db;
+            font-size: .92rem;
+        }
+
+        /* ======== Utilities ======== */
+        .spinner-overlay {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 3rem;
+        }
         .spinner-overlay .spinner-border { color: var(--primary); }
-        .empty-state { text-align: center; padding: 3rem 1rem; color: #94a3b8; }
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #94a3b8;
+        }
         .empty-state i { font-size: 3rem; margin-bottom: 1rem; }
         .toast-container { z-index: 9999; }
+        .loading-skeleton {
+            background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: .5rem;
+        }
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        .bg-pattern-light {
+            background-color: #fff;
+            background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%231a5632' fill-opacity='0.02'%3E%3Cpath d='M20 20.5V18H0v-2h20v-2H0V0h2v14h16V0h2v14h16V0h2v14H54v2H38v2h16v2H0v-2h20z'/%3E%3C/g%3E%3C/svg%3E");
+        }
 
-        /* ========== Footer ========== */
-        .footer { background: var(--primary-dark); color: rgba(255,255,255,.7); padding: 2.5rem 0; }
-        .footer a { color: rgba(255,255,255,.85); text-decoration: none; }
+        /* ======== Map view (Leaflet) ======== */
+        .view-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: .5rem; overflow: hidden; }
+        .view-toggle button {
+            border: 0; background: #fff; color: var(--text-muted);
+            padding: .35rem .9rem; font-size: .875rem; font-weight: 600;
+            display: inline-flex; align-items: center; gap: .4rem;
+            transition: var(--transition);
+        }
+        .view-toggle button:hover { background: var(--primary-50); color: var(--primary); }
+        .view-toggle button.active { background: var(--primary); color: #fff; }
+        .view-toggle button:focus-visible { outline: 2px solid var(--secondary); outline-offset: -2px; }
+
+        .map-panel {
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 1rem;
+            box-shadow: var(--card-shadow);
+            overflow: hidden;
+        }
+        .map-panel .map-controls {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border);
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1rem;
+            align-items: end;
+        }
+        .map-panel .map-controls label {
+            font-size: .78rem; font-weight: 600; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: .03em; margin-bottom: .25rem;
+            display: block;
+        }
+        .map-panel .map-controls .range-row {
+            display: flex; align-items: center; gap: .5rem;
+        }
+        .map-panel .map-controls input[type="range"] { flex: 1; accent-color: var(--primary); }
+        .map-panel .map-controls .range-val {
+            font-variant-numeric: tabular-nums;
+            font-weight: 700; color: var(--primary); min-width: 4.5rem; text-align: right;
+        }
+        #lotsMap { width: 100%; height: 520px; }
+        @media (max-width: 600px) { #lotsMap { height: 400px; } }
+
+        .leaflet-popup-content { margin: .75rem .9rem; font-family: inherit; }
+        .lot-popup h6 { margin: 0 0 .25rem 0; color: var(--primary); font-size: .95rem; }
+        .lot-popup .lot-popup-meta { font-size: .8rem; color: var(--text-muted); line-height: 1.5; }
+        .lot-popup .lot-popup-meta strong { color: var(--text); }
+        .lot-popup .lot-popup-footer {
+            margin-top: .5rem; display: flex; justify-content: space-between;
+            align-items: center; gap: .5rem;
+        }
+        .lot-popup .lot-popup-price { font-weight: 700; color: var(--primary); font-size: 1rem; }
+        .lot-popup .lot-popup-dist {
+            font-size: .72rem; color: var(--text-muted);
+            background: var(--primary-50); padding: .15rem .45rem; border-radius: .4rem;
+        }
+        .lot-popup button {
+            background: var(--primary); color: #fff; border: 0;
+            padding: .3rem .75rem; border-radius: .45rem; font-size: .8rem; font-weight: 600;
+            cursor: pointer; transition: var(--transition);
+        }
+        .lot-popup button:hover { background: var(--primary-dark); }
+
+        /* Category-colored pins (SVG drop-pins) */
+        .pin-marker {
+            width: 30px; height: 38px;
+            display: flex; align-items: flex-start; justify-content: center;
+            pointer-events: auto;
+        }
+        .pin-marker svg { filter: drop-shadow(0 2px 3px rgba(0,0,0,.35)); }
+
+        .map-legend {
+            padding: .6rem .9rem; border-top: 1px solid var(--border);
+            font-size: .78rem; color: var(--text-muted);
+            display: flex; flex-wrap: wrap; gap: .75rem 1.25rem; align-items: center;
+            background: #fafbfc;
+        }
+        .map-legend .legend-dot {
+            width: .75rem; height: .75rem; border-radius: 50%;
+            display: inline-block; margin-right: .35rem; vertical-align: -1px;
+        }
+
+        /* ======== Footer ======== */
+        .footer {
+            background: linear-gradient(180deg, var(--primary-dark) 0%, #071f12 100%);
+            color: rgba(255,255,255,.7);
+            padding: 3.5rem 0 1.5rem;
+        }
+        .footer a {
+            color: rgba(255,255,255,.8);
+            text-decoration: none;
+            transition: var(--transition);
+        }
         .footer a:hover { color: var(--secondary); }
-        .footer-brand { font-size: 1.2rem; font-weight: 800; color: #fff; }
+        .footer-brand {
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: #fff;
+        }
         .footer-brand span { color: var(--secondary); }
-
-        /* ========== Features grid ========== */
-        .feature-card {
-            text-align: center; padding: 2rem 1.5rem; border-radius: 1rem;
-            background: #fff; border: 1px solid #e2e8f0; box-shadow: var(--card-shadow);
-            transition: all .2s;
-        }
-        .feature-card:hover { box-shadow: var(--card-hover); transform: translateY(-2px); }
-        .feature-icon {
-            width: 64px; height: 64px; border-radius: 1rem; margin: 0 auto 1rem;
-            display: flex; align-items: center; justify-content: center; font-size: 1.6rem;
+        .footer-links { list-style: none; padding: 0; margin: 0; }
+        .footer-links li { margin-bottom: .4rem; }
+        .footer-links a { font-size: .88rem; }
+        .footer-bottom {
+            border-top: 1px solid rgba(255,255,255,.08);
+            padding-top: 1.5rem;
+            margin-top: 2rem;
         }
 
-        /* ========== Compliance banner ========== */
-        .compliance-bar {
-            background: linear-gradient(90deg, #fef3c7 0%, #fde68a 100%);
-            padding: .6rem 0; font-size: .85rem; color: #92400e; font-weight: 500;
+        /* ======== Responsive ======== */
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 2rem; }
+            .hero .lead { font-size: 1rem; }
+            .hero-stats { gap: 1.2rem; }
+            .hero-stat .num { font-size: 1.6rem; }
+            .section-title { font-size: 1.6rem; }
+            .step-arrow { display: none; }
+            .pricing-card { padding: 1.5rem; }
         }
     </style>
 </head>
 <body>
 
-<!-- Compliance Banner -->
-<div class="compliance-bar text-center">
-    <i class="bi bi-shield-check me-1"></i>
-    Plataforma alineada con la <strong>Ley 1/2025</strong> de prevencion de perdidas y desperdicio alimentario
-</div>
-
-<!-- Navbar -->
-<nav class="navbar navbar-expand-lg nav-main sticky-top">
+<!-- ==================== NAVBAR ==================== -->
+<nav class="navbar navbar-expand-lg nav-main sticky-top" id="mainNav">
     <div class="container">
-        <a class="navbar-brand" href="#">
-            <i class="bi bi-recycle me-2"></i>Surplus<span>AI</span>
+        <a class="navbar-brand" href="#inicio">
+            <i class="bi bi-recycle me-1"></i>Surplus<span>AI</span>
         </a>
-        <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navMain">
+        <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navMain" aria-label="Menu">
             <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="navMain">
             <ul class="navbar-nav ms-auto me-3 gap-1">
-                <li class="nav-item"><a class="nav-link active" href="#hero" data-nav="hero">Inicio</a></li>
-                <li class="nav-item"><a class="nav-link" href="#dashboard" data-nav="dashboard">Dashboard</a></li>
+                <li class="nav-item"><a class="nav-link active" href="#inicio" data-nav="inicio">Inicio</a></li>
                 <li class="nav-item"><a class="nav-link" href="#marketplace" data-nav="marketplace">Marketplace</a></li>
+                <li class="nav-item"><a class="nav-link" href="#dashboard" data-nav="dashboard">Dashboard</a></li>
+                <li class="nav-item"><a class="nav-link" href="#ley" data-nav="ley">Ley 1/2025</a></li>
+                <li class="nav-item"><a class="nav-link" href="#contacto" data-nav="contacto">Contacto</a></li>
             </ul>
-            <div id="navAuth">
-                <button class="btn btn-primary-custom" onclick="showAuthModal()">
-                    <i class="bi bi-box-arrow-in-right me-1"></i> Acceder
+            <div id="navAuth" class="d-flex gap-2">
+                <button class="btn btn-outline-custom btn-sm" onclick="showAuthModal('login')">
+                    <i class="bi bi-box-arrow-in-right me-1"></i>Acceder
+                </button>
+                <button class="btn btn-primary-custom btn-sm" onclick="showAuthModal('register')">
+                    Registrarse
                 </button>
             </div>
             <div id="navUser" class="d-none d-flex align-items-center gap-2">
-                <span class="badge bg-light text-dark" id="navUserName"></span>
-                <button class="btn btn-sm btn-outline-custom" onclick="logout()">
+                <div class="d-flex align-items-center gap-2 px-2 py-1 rounded-pill" style="background:var(--primary-50)">
+                    <i class="bi bi-person-circle" style="color:var(--primary)"></i>
+                    <span class="fw-semibold small" style="color:var(--primary)" id="navUserName"></span>
+                </div>
+                <button class="btn btn-sm btn-outline-custom" onclick="logout()" title="Cerrar sesion">
                     <i class="bi bi-box-arrow-right"></i>
                 </button>
             </div>
@@ -212,25 +917,29 @@
 </nav>
 
 <!-- ==================== HERO ==================== -->
-<section id="hero" class="hero">
+<section id="inicio" class="hero">
+    <div class="hero-pattern"></div>
     <div class="container position-relative" style="z-index:2">
         <div class="row align-items-center">
             <div class="col-lg-7 mb-4 mb-lg-0">
                 <span class="badge-ley mb-3">
-                    <i class="bi bi-cpu me-1"></i> Potenciado por IA
+                    <i class="bi bi-shield-check"></i> Ley 1/2025 en vigor desde abril 2026
                 </span>
-                <h1 class="mb-3">El marketplace B2B<br>de excedentes alimentarios</h1>
+                <h1 class="mb-3">
+                    Espana desperdicia<br>
+                    <span class="text-amber">7,7 millones de toneladas</span><br>
+                    de alimentos al ano
+                </h1>
                 <p class="lead mb-4">
-                    Conectamos generadores y receptores de excedentes alimentarios con inteligencia artificial.
-                    Reduce desperdicio, cumple la normativa y genera impacto positivo.
+                    SurplusAI es el marketplace B2B que conecta generadores y receptores de excedentes alimentarios con inteligencia artificial. Reduce el desperdicio, cumple la normativa y genera valor de tus excedentes.
                 </p>
-                <div class="d-flex gap-3 flex-wrap mb-2">
-                    <button class="btn btn-secondary-custom btn-lg px-4" onclick="showAuthModal('register')">
-                        <i class="bi bi-rocket-takeoff me-1"></i> Registrar empresa
-                    </button>
-                    <a href="#marketplace" class="btn btn-outline-light btn-lg px-4">
-                        <i class="bi bi-grid me-1"></i> Ver marketplace
+                <div class="d-flex gap-3 flex-wrap">
+                    <a href="#marketplace" class="btn btn-secondary-custom btn-lg px-4">
+                        <i class="bi bi-grid-3x3-gap me-1"></i> Ver Marketplace
                     </a>
+                    <button class="btn btn-outline-light-custom btn-lg px-4" onclick="showAuthModal('register')">
+                        <i class="bi bi-rocket-takeoff me-1"></i> Registrarse
+                    </button>
                 </div>
                 <div class="hero-stats" id="heroStats">
                     <div class="hero-stat">
@@ -242,8 +951,8 @@
                         <div class="label">Receptores</div>
                     </div>
                     <div class="hero-stat">
-                        <div class="num" id="heroKg">--</div>
-                        <div class="label">Kg recuperados</div>
+                        <div class="num" id="heroLotes">--</div>
+                        <div class="label">Lotes activos</div>
                     </div>
                     <div class="hero-stat">
                         <div class="num" id="heroCO2">--</div>
@@ -251,122 +960,113 @@
                     </div>
                 </div>
             </div>
-            <div class="col-lg-5 text-center d-none d-lg-block">
-                <div class="hero-visual"><i class="bi bi-box-seam"></i></div>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- ==================== FEATURES ==================== -->
-<section class="py-5">
-    <div class="container">
-        <div class="row g-4">
-            <div class="col-md-4">
-                <div class="feature-card h-100">
-                    <div class="feature-icon" style="background:#dcfce7;color:#166534">
-                        <i class="bi bi-robot"></i>
+            <div class="col-lg-5 d-none d-lg-block">
+                <div class="hero-illustration">
+                    <div class="floating-card d-flex align-items-center gap-3">
+                        <div class="fc-icon" style="background:rgba(245,158,11,.2);color:#fbbf24">
+                            <i class="bi bi-box-seam-fill"></i>
+                        </div>
+                        <div>
+                            <div class="fw-bold small">Nuevo lote publicado</div>
+                            <div class="small opacity-75">1.200 kg de fruta fresca</div>
+                        </div>
                     </div>
-                    <h5 class="fw-bold">Matching con IA</h5>
-                    <p class="text-muted small mb-0">
-                        Algoritmos inteligentes conectan oferta y demanda en tiempo real para maximizar el aprovechamiento.
-                    </p>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="feature-card h-100">
-                    <div class="feature-icon" style="background:#fef3c7;color:#92400e">
-                        <i class="bi bi-shield-check"></i>
+                    <div class="floating-card d-flex align-items-center gap-3">
+                        <div class="fc-icon" style="background:rgba(34,118,62,.3);color:#86efac">
+                            <i class="bi bi-robot"></i>
+                        </div>
+                        <div>
+                            <div class="fw-bold small">Match IA encontrado</div>
+                            <div class="small opacity-75">3 receptores compatibles</div>
+                        </div>
                     </div>
-                    <h5 class="fw-bold">Cumplimiento legal</h5>
-                    <p class="text-muted small mb-0">
-                        Trazabilidad completa y documentacion automatica para cumplir con la Ley 1/2025.
-                    </p>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="feature-card h-100">
-                    <div class="feature-icon" style="background:#dbeafe;color:#1e40af">
-                        <i class="bi bi-graph-up-arrow"></i>
+                    <div class="floating-card d-flex align-items-center gap-3">
+                        <div class="fc-icon" style="background:rgba(59,130,246,.2);color:#93c5fd">
+                            <i class="bi bi-check-circle-fill"></i>
+                        </div>
+                        <div>
+                            <div class="fw-bold small">Transaccion completada</div>
+                            <div class="small opacity-75">480 kg CO2 evitados</div>
+                        </div>
                     </div>
-                    <h5 class="fw-bold">Impacto medible</h5>
-                    <p class="text-muted small mb-0">
-                        Dashboard en tiempo real con metricas de CO2 evitado, kg recuperados y ahorro economico.
-                    </p>
                 </div>
             </div>
         </div>
     </div>
 </section>
 
-<!-- ==================== DASHBOARD ==================== -->
-<section id="dashboard" class="py-5" style="background:#fff">
+<!-- ==================== COMPLIANCE BANNER ==================== -->
+<section class="compliance-section" id="compliance-banner">
     <div class="container">
-        <div class="text-center mb-5">
-            <h2 class="section-title">Dashboard de impacto</h2>
-            <p class="section-subtitle">Datos en tiempo real del marketplace</p>
+        <div class="d-flex flex-column flex-md-row align-items-center justify-content-center gap-3 text-center">
+            <span class="badge-compliance">
+                <i class="bi bi-shield-fill-check"></i>
+                Certificado Ley 1/2025
+            </span>
+            <p class="mb-0">
+                La <strong>Ley 1/2025</strong> de prevencion de perdidas y desperdicio alimentario esta en vigor desde abril 2026.
+                SurplusAI garantiza el <strong>cumplimiento normativo completo</strong> con trazabilidad automatica.
+            </p>
         </div>
+    </div>
+</section>
 
-        <div class="row g-3 mb-4" id="dashStats">
-            <div class="col-6 col-md-4 col-xl-2">
-                <div class="stat-card">
-                    <div class="stat-icon mb-2" style="background:#dcfce7;color:#166534"><i class="bi bi-box-seam"></i></div>
-                    <div class="value" id="statKg">--</div>
-                    <div class="label">Kg recuperados</div>
-                </div>
-            </div>
-            <div class="col-6 col-md-4 col-xl-2">
-                <div class="stat-card">
-                    <div class="stat-icon mb-2" style="background:#dbeafe;color:#1e40af"><i class="bi bi-wind"></i></div>
-                    <div class="value" id="statCO2">--</div>
-                    <div class="label">Kg CO2 evitados</div>
-                </div>
-            </div>
-            <div class="col-6 col-md-4 col-xl-2">
-                <div class="stat-card">
-                    <div class="stat-icon mb-2" style="background:#fef3c7;color:#92400e"><i class="bi bi-arrow-left-right"></i></div>
-                    <div class="value" id="statTx">--</div>
-                    <div class="label">Transacciones</div>
-                </div>
-            </div>
-            <div class="col-6 col-md-4 col-xl-2">
-                <div class="stat-card">
-                    <div class="stat-icon mb-2" style="background:#f3e8ff;color:#6b21a8"><i class="bi bi-currency-euro"></i></div>
-                    <div class="value" id="statMoney">--</div>
-                    <div class="label">Dinero movido</div>
-                </div>
-            </div>
-            <div class="col-6 col-md-4 col-xl-2">
-                <div class="stat-card">
-                    <div class="stat-icon mb-2" style="background:#fee2e2;color:#991b1b"><i class="bi bi-building"></i></div>
-                    <div class="value" id="statGen">--</div>
-                    <div class="label">Generadores</div>
-                </div>
-            </div>
-            <div class="col-6 col-md-4 col-xl-2">
-                <div class="stat-card">
-                    <div class="stat-icon mb-2" style="background:#cffafe;color:#155e75"><i class="bi bi-shop"></i></div>
-                    <div class="value" id="statRec">--</div>
-                    <div class="label">Receptores</div>
-                </div>
-            </div>
+<!-- ==================== HOW IT WORKS ==================== -->
+<section class="py-5 bg-pattern-light" id="como-funciona">
+    <div class="container py-3">
+        <div class="text-center mb-5 fade-in-up">
+            <h2 class="section-title">Como funciona</h2>
+            <p class="section-subtitle mx-auto">Empieza a operar en el marketplace en menos de 5 minutos</p>
+            <div class="section-divider mx-auto"></div>
         </div>
-
-        <div class="row g-4">
-            <div class="col-lg-7">
-                <div class="chart-card">
-                    <h6 class="fw-bold mb-3"><i class="bi bi-bar-chart me-2 text-muted"></i>Transacciones por dia</h6>
-                    <div style="position:relative;height:260px">
-                        <canvas id="chartTx"></canvas>
+        <div class="row g-4 align-items-stretch justify-content-center">
+            <div class="col-6 col-lg-2 fade-in-up">
+                <div class="step-card">
+                    <div class="step-number">1</div>
+                    <div class="step-icon mx-auto" style="background:#dcfce7;color:#166534">
+                        <i class="bi bi-person-plus-fill"></i>
                     </div>
+                    <h6 class="fw-bold mb-2">Registrate</h6>
+                    <p class="small text-muted mb-0">Crea tu cuenta como generador o receptor en 2 minutos</p>
                 </div>
             </div>
-            <div class="col-lg-5">
-                <div class="chart-card">
-                    <h6 class="fw-bold mb-3"><i class="bi bi-pie-chart me-2 text-muted"></i>Distribucion por categoria</h6>
-                    <div style="position:relative;height:260px">
-                        <canvas id="chartCat"></canvas>
+            <div class="col-auto d-none d-lg-flex align-items-center">
+                <div class="step-arrow"><i class="bi bi-chevron-right"></i></div>
+            </div>
+            <div class="col-6 col-lg-2 fade-in-up">
+                <div class="step-card">
+                    <div class="step-number">2</div>
+                    <div class="step-icon mx-auto" style="background:#fef3c7;color:#92400e">
+                        <i class="bi bi-upload"></i>
                     </div>
+                    <h6 class="fw-bold mb-2">Publica lotes</h6>
+                    <p class="small text-muted mb-0">Sube tus excedentes con categoria, cantidad y precio</p>
+                </div>
+            </div>
+            <div class="col-auto d-none d-lg-flex align-items-center">
+                <div class="step-arrow"><i class="bi bi-chevron-right"></i></div>
+            </div>
+            <div class="col-6 col-lg-2 fade-in-up">
+                <div class="step-card">
+                    <div class="step-number">3</div>
+                    <div class="step-icon mx-auto" style="background:#dbeafe;color:#1e40af">
+                        <i class="bi bi-cpu-fill"></i>
+                    </div>
+                    <h6 class="fw-bold mb-2">IA conecta</h6>
+                    <p class="small text-muted mb-0">Nuestros algoritmos emparejan oferta y demanda en tiempo real</p>
+                </div>
+            </div>
+            <div class="col-auto d-none d-lg-flex align-items-center">
+                <div class="step-arrow"><i class="bi bi-chevron-right"></i></div>
+            </div>
+            <div class="col-6 col-lg-2 fade-in-up">
+                <div class="step-card">
+                    <div class="step-number">4</div>
+                    <div class="step-icon mx-auto" style="background:#d1fae5;color:#065f46">
+                        <i class="bi bi-handshake"></i>
+                    </div>
+                    <h6 class="fw-bold mb-2">Transaccion</h6>
+                    <p class="small text-muted mb-0">Cierra la operacion con trazabilidad y documentacion automatica</p>
                 </div>
             </div>
         </div>
@@ -375,14 +1075,23 @@
 
 <!-- ==================== MARKETPLACE ==================== -->
 <section id="marketplace" class="py-5">
-    <div class="container">
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+    <div class="container py-3">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4 fade-in-up">
             <div>
                 <h2 class="section-title mb-1">Marketplace</h2>
-                <p class="section-subtitle mb-0">Lotes de excedentes disponibles</p>
+                <p class="section-subtitle mb-0">Lotes de excedentes alimentarios disponibles</p>
+                <div class="section-divider"></div>
             </div>
-            <div class="d-flex gap-2 flex-wrap">
-                <select class="form-select form-select-sm" id="filterCat" style="width:auto" onchange="renderLots()">
+            <div class="d-flex gap-2 flex-wrap align-items-center mt-2">
+                <div class="view-toggle" role="tablist" aria-label="Vista de marketplace">
+                    <button type="button" id="viewToggleList" class="active" role="tab" aria-selected="true" aria-controls="lotsContainer" onclick="setMarketplaceView('list')" title="Vista lista">
+                        <i class="bi bi-grid-3x3-gap"></i><span class="d-none d-sm-inline">Lista</span>
+                    </button>
+                    <button type="button" id="viewToggleMap" role="tab" aria-selected="false" aria-controls="mapPanel" onclick="setMarketplaceView('map')" title="Vista mapa — lo más cercano">
+                        <i class="bi bi-geo-alt-fill"></i><span class="d-none d-sm-inline">Mapa</span>
+                    </button>
+                </div>
+                <select class="form-select form-select-sm" id="filterCat" style="width:auto" onchange="onFilterChange()">
                     <option value="">Todas las categorias</option>
                     <option value="frutas">Frutas</option>
                     <option value="verduras">Verduras</option>
@@ -398,28 +1107,537 @@
                     <option value="price_asc">Precio: menor</option>
                     <option value="price_desc">Precio: mayor</option>
                     <option value="expiry">Expiran pronto</option>
-                    <option value="bids">Mas pujas</option>
                 </select>
-                <button class="btn btn-sm btn-primary-custom" onclick="loadLots()">
+                <button class="btn btn-sm btn-primary-custom" onclick="refreshMarketplace()" title="Refrescar">
                     <i class="bi bi-arrow-clockwise"></i>
                 </button>
             </div>
         </div>
         <div id="lotsContainer">
-            <div class="spinner-overlay"><div class="spinner-border" role="status"><span class="visually-hidden">Cargando...</span></div></div>
+            <div class="spinner-overlay">
+                <div class="spinner-border" role="status"><span class="visually-hidden">Cargando...</span></div>
+            </div>
+        </div>
+        <!-- ======== Parallel map view (same data, "lo más cercano") ======== -->
+        <div id="mapPanel" class="map-panel" style="display:none" role="tabpanel" aria-labelledby="viewToggleMap">
+            <div class="map-controls">
+                <div>
+                    <label for="mapRadius">Radio de búsqueda</label>
+                    <div class="range-row">
+                        <input type="range" id="mapRadius" min="5" max="200" step="5" value="50" oninput="onMapControlChange()">
+                        <span class="range-val" id="mapRadiusVal">50 km</span>
+                    </div>
+                </div>
+                <div>
+                    <label for="mapMaxWeight">Peso máximo del lote</label>
+                    <div class="range-row">
+                        <input type="range" id="mapMaxWeight" min="0" max="2000" step="10" value="0" oninput="onMapControlChange()">
+                        <span class="range-val" id="mapMaxWeightVal">Cualquiera</span>
+                    </div>
+                    <small class="text-muted" id="mapWeightHint" style="font-size:.72rem">Los lotes pequeños priorizan cercanía logística.</small>
+                </div>
+                <div>
+                    <label for="mapLat">Ubicación del receptor</label>
+                    <div class="d-flex gap-2 align-items-center">
+                        <input type="number" id="mapLat" class="form-control form-control-sm" step="0.0001" placeholder="Lat" value="40.4168" style="width:7rem">
+                        <input type="number" id="mapLon" class="form-control form-control-sm" step="0.0001" placeholder="Lon" value="-3.7038" style="width:7rem">
+                        <button class="btn btn-sm btn-outline-success" type="button" id="btnGeoLocate" onclick="useMyLocation()" title="Usar mi ubicación">
+                            <i class="bi bi-crosshair"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="d-flex align-items-end">
+                    <button class="btn btn-sm btn-primary-custom w-100" type="button" onclick="loadNearbyLots()">
+                        <i class="bi bi-search me-1"></i> Buscar cerca
+                    </button>
+                </div>
+            </div>
+            <div id="lotsMap" tabindex="0" aria-label="Mapa de lotes cercanos"></div>
+            <div class="map-legend" aria-label="Leyenda de categorías">
+                <span><strong>Leyenda:</strong></span>
+                <span><span class="legend-dot" style="background:#22c55e"></span>Frutas</span>
+                <span><span class="legend-dot" style="background:#84cc16"></span>Verduras</span>
+                <span><span class="legend-dot" style="background:#3b82f6"></span>Lácteos</span>
+                <span><span class="legend-dot" style="background:#ef4444"></span>Carnes</span>
+                <span><span class="legend-dot" style="background:#06b6d4"></span>Pescados</span>
+                <span><span class="legend-dot" style="background:#eab308"></span>Panadería</span>
+                <span><span class="legend-dot" style="background:#a855f7"></span>Preparados</span>
+                <span><span class="legend-dot" style="background:#94a3b8"></span>Otros</span>
+                <span class="ms-auto" id="mapStatus" aria-live="polite"></span>
+            </div>
         </div>
     </div>
 </section>
+
+<!-- ==================== DASHBOARD ==================== -->
+<section id="dashboard" class="py-5 bg-pattern-light">
+    <div class="container py-3">
+        <div class="text-center mb-5 fade-in-up">
+            <h2 class="section-title">Dashboard de impacto</h2>
+            <p class="section-subtitle mx-auto">Datos en tiempo real del marketplace de excedentes</p>
+            <div class="section-divider mx-auto"></div>
+        </div>
+
+        <div class="row g-3 mb-4" id="dashStats">
+            <div class="col-6 col-md-4 col-xl-2 fade-in-up">
+                <div class="stat-card">
+                    <div class="stat-icon mb-2" style="background:#dcfce7;color:#166534"><i class="bi bi-box-seam-fill"></i></div>
+                    <div class="value" id="statLotes">--</div>
+                    <div class="label">Lotes totales</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2 fade-in-up">
+                <div class="stat-card">
+                    <div class="stat-icon mb-2" style="background:#dbeafe;color:#1e40af"><i class="bi bi-wind"></i></div>
+                    <div class="value" id="statCO2">--</div>
+                    <div class="label">Kg CO2 evitados</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2 fade-in-up">
+                <div class="stat-card">
+                    <div class="stat-icon mb-2" style="background:#fef3c7;color:#92400e"><i class="bi bi-arrow-left-right"></i></div>
+                    <div class="value" id="statTx">--</div>
+                    <div class="label">Transacciones</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2 fade-in-up">
+                <div class="stat-card">
+                    <div class="stat-icon mb-2" style="background:#f3e8ff;color:#6b21a8"><i class="bi bi-currency-euro"></i></div>
+                    <div class="value" id="statMoney">--</div>
+                    <div class="label">Volumen EUR</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2 fade-in-up">
+                <div class="stat-card">
+                    <div class="stat-icon mb-2" style="background:#fee2e2;color:#991b1b"><i class="bi bi-building"></i></div>
+                    <div class="value" id="statGen">--</div>
+                    <div class="label">Generadores</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2 fade-in-up">
+                <div class="stat-card">
+                    <div class="stat-icon mb-2" style="background:#cffafe;color:#155e75"><i class="bi bi-shop"></i></div>
+                    <div class="value" id="statRec">--</div>
+                    <div class="label">Receptores</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-5 fade-in-up">
+                <div class="chart-card">
+                    <h6 class="fw-bold mb-3"><i class="bi bi-pie-chart-fill me-2" style="color:var(--primary)"></i>Lotes por categoria</h6>
+                    <div style="position:relative;height:280px">
+                        <canvas id="chartCat"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-7 fade-in-up">
+                <div class="chart-card">
+                    <h6 class="fw-bold mb-3"><i class="bi bi-graph-up me-2" style="color:var(--primary)"></i>Actividad del marketplace</h6>
+                    <div style="position:relative;height:280px">
+                        <canvas id="chartTx"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row g-4 mt-1">
+            <div class="col-12 fade-in-up">
+                <div class="chart-card">
+                    <h6 class="fw-bold mb-3"><i class="bi bi-trophy-fill me-2" style="color:var(--secondary)"></i>Top generadores por volumen</h6>
+                    <div style="position:relative;height:250px">
+                        <canvas id="chartGenerators"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ==================== PRICING ==================== -->
+<section id="precios" class="py-5">
+    <div class="container py-3">
+        <div class="text-center mb-5 fade-in-up">
+            <h2 class="section-title">Planes y precios</h2>
+            <p class="section-subtitle mx-auto">Elige el plan que mejor se adapte a tu volumen de operaciones</p>
+            <div class="section-divider mx-auto"></div>
+        </div>
+        <div class="row g-4 justify-content-center">
+            <div class="col-md-6 col-lg-4 fade-in-up">
+                <div class="pricing-card">
+                    <div class="text-center mb-4">
+                        <div class="d-inline-flex align-items-center justify-content-center rounded-circle mb-3" style="width:56px;height:56px;background:var(--primary-50)">
+                            <i class="bi bi-box-seam" style="font-size:1.4rem;color:var(--primary)"></i>
+                        </div>
+                        <h5 class="fw-bold mb-1">Basico</h5>
+                        <p class="small text-muted mb-3">Para pequenos generadores</p>
+                        <div class="price">299<small> EUR/mes</small></div>
+                    </div>
+                    <ul class="feature-list">
+                        <li><i class="bi bi-check-circle-fill"></i> Hasta 50 lotes/mes</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Panel de control basico</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Cumplimiento Ley 1/2025</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Soporte por email</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Trazabilidad documental</li>
+                        <li class="disabled"><i class="bi bi-x-circle-fill"></i> Matching con IA avanzado</li>
+                        <li class="disabled"><i class="bi bi-x-circle-fill"></i> API de integracion</li>
+                        <li class="disabled"><i class="bi bi-x-circle-fill"></i> Account manager dedicado</li>
+                    </ul>
+                    <button class="btn btn-outline-custom w-100 py-2" onclick="showAuthModal('register')">Empezar gratis 14 dias</button>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-4 fade-in-up">
+                <div class="pricing-card featured">
+                    <div class="text-center mb-4">
+                        <div class="d-inline-flex align-items-center justify-content-center rounded-circle mb-3" style="width:56px;height:56px;background:var(--primary-100)">
+                            <i class="bi bi-star-fill" style="font-size:1.4rem;color:var(--primary)"></i>
+                        </div>
+                        <h5 class="fw-bold mb-1">Profesional</h5>
+                        <p class="small text-muted mb-3">Para cadenas y distribuidores</p>
+                        <div class="price">599<small> EUR/mes</small></div>
+                    </div>
+                    <ul class="feature-list">
+                        <li><i class="bi bi-check-circle-fill"></i> Lotes ilimitados</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Dashboard avanzado con analytics</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Cumplimiento Ley 1/2025</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Soporte prioritario 24/7</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Trazabilidad completa</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Matching con IA avanzado</li>
+                        <li><i class="bi bi-check-circle-fill"></i> API de integracion (REST)</li>
+                        <li class="disabled"><i class="bi bi-x-circle-fill"></i> Account manager dedicado</li>
+                    </ul>
+                    <button class="btn btn-primary-custom w-100 py-2" onclick="showAuthModal('register')">Empezar gratis 14 dias</button>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-4 fade-in-up">
+                <div class="pricing-card">
+                    <div class="text-center mb-4">
+                        <div class="d-inline-flex align-items-center justify-content-center rounded-circle mb-3" style="width:56px;height:56px;background:#fef3c7">
+                            <i class="bi bi-gem" style="font-size:1.4rem;color:var(--secondary-dark)"></i>
+                        </div>
+                        <h5 class="fw-bold mb-1">Enterprise</h5>
+                        <p class="small text-muted mb-3">Para grandes corporaciones</p>
+                        <div class="price">999<small> EUR/mes</small></div>
+                    </div>
+                    <ul class="feature-list">
+                        <li><i class="bi bi-check-circle-fill"></i> Todo del plan Profesional</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Multi-sede y multi-usuario</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Auditoria y compliance avanzado</li>
+                        <li><i class="bi bi-check-circle-fill"></i> SLA garantizado 99.9%</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Integraciones ERP/SAP</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Matching con IA predictivo</li>
+                        <li><i class="bi bi-check-circle-fill"></i> API completa + Webhooks</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Account manager dedicado</li>
+                    </ul>
+                    <button class="btn btn-outline-custom w-100 py-2" onclick="showAuthModal('register')">Contactar ventas</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ==================== LEY 1/2025 ==================== -->
+<section id="ley" class="py-5 bg-pattern-light">
+    <div class="container py-3">
+        <div class="text-center mb-5 fade-in-up">
+            <h2 class="section-title">Ley 1/2025 de desperdicio alimentario</h2>
+            <p class="section-subtitle mx-auto">La normativa que obliga a todas las empresas alimentarias a prevenir y gestionar sus excedentes</p>
+            <div class="section-divider mx-auto"></div>
+        </div>
+        <div class="row g-4 mb-4">
+            <div class="col-md-6 col-lg-3 fade-in-up">
+                <div class="law-card text-center">
+                    <div class="d-inline-flex align-items-center justify-content-center rounded-circle mb-3" style="width:56px;height:56px;background:#fee2e2">
+                        <i class="bi bi-exclamation-triangle-fill" style="font-size:1.4rem;color:#dc2626"></i>
+                    </div>
+                    <h6 class="fw-bold">Multas severas</h6>
+                    <div class="penalty-badge mb-2">Hasta 500.000 EUR</div>
+                    <p class="small text-muted mb-0">Las infracciones muy graves por incumplimiento pueden alcanzar sanciones de medio millon de euros</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3 fade-in-up">
+                <div class="law-card text-center">
+                    <div class="d-inline-flex align-items-center justify-content-center rounded-circle mb-3" style="width:56px;height:56px;background:#dbeafe">
+                        <i class="bi bi-file-earmark-text-fill" style="font-size:1.4rem;color:#2563eb"></i>
+                    </div>
+                    <h6 class="fw-bold">Plan obligatorio</h6>
+                    <p class="small text-muted mb-0">Todas las empresas de la cadena alimentaria deben tener un plan de prevencion de perdidas y desperdicio</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3 fade-in-up">
+                <div class="law-card text-center">
+                    <div class="d-inline-flex align-items-center justify-content-center rounded-circle mb-3" style="width:56px;height:56px;background:#fef3c7">
+                        <i class="bi bi-arrow-repeat" style="font-size:1.4rem;color:#d97706"></i>
+                    </div>
+                    <h6 class="fw-bold">Jerarquia de usos</h6>
+                    <p class="small text-muted mb-0">Prioridad: consumo humano, transformacion, alimentacion animal, compostaje y bioenergia</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3 fade-in-up">
+                <div class="law-card text-center">
+                    <div class="d-inline-flex align-items-center justify-content-center rounded-circle mb-3" style="width:56px;height:56px;background:#dcfce7">
+                        <i class="bi bi-clipboard-data-fill" style="font-size:1.4rem;color:#16a34a"></i>
+                    </div>
+                    <h6 class="fw-bold">Trazabilidad</h6>
+                    <p class="small text-muted mb-0">Registro detallado de todas las operaciones con excedentes alimentarios para auditorias</p>
+                </div>
+            </div>
+        </div>
+        <div class="row justify-content-center fade-in-up">
+            <div class="col-lg-10">
+                <div class="law-card" style="border-left:4px solid var(--primary);background:var(--primary-50)">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h5 class="fw-bold mb-2" style="color:var(--primary-dark)">
+                                <i class="bi bi-shield-fill-check me-2"></i>SurplusAI te ayuda a cumplir
+                            </h5>
+                            <p class="mb-0 text-muted">
+                                Nuestra plataforma automatiza la documentacion requerida por la ley: registro de excedentes,
+                                trazabilidad de destino, jerarquia de usos prioritarios, convenios con entidades receptoras y
+                                generacion de informes para inspecciones. Todo en un solo lugar.
+                            </p>
+                        </div>
+                        <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                            <button class="btn btn-primary-custom" onclick="showAuthModal('register')">
+                                <i class="bi bi-rocket-takeoff me-1"></i> Empieza ya
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ==================== TESTIMONIALS ==================== -->
+<section id="testimonios" class="py-5">
+    <div class="container py-3">
+        <div class="text-center mb-5 fade-in-up">
+            <h2 class="section-title">Lo que dicen nuestros usuarios</h2>
+            <p class="section-subtitle mx-auto">Empresas que ya reducen su desperdicio alimentario con SurplusAI</p>
+            <div class="section-divider mx-auto"></div>
+        </div>
+        <div class="row g-4">
+            <div class="col-md-4 fade-in-up">
+                <div class="testimonial-card">
+                    <div class="stars mb-3">
+                        <i class="bi bi-star-fill"></i>
+                        <i class="bi bi-star-fill"></i>
+                        <i class="bi bi-star-fill"></i>
+                        <i class="bi bi-star-fill"></i>
+                        <i class="bi bi-star-fill"></i>
+                    </div>
+                    <p class="quote mb-4">"Antes tirábamos un 12% de nuestra produccion de panaderia. Con SurplusAI hemos reducido el desperdicio al 2% y recuperamos valor de los excedentes. Ademas, el cumplimiento legal esta automatizado."</p>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="testimonial-avatar" style="background:var(--primary-100);color:var(--primary)">MG</div>
+                        <div>
+                            <div class="fw-bold small">Maria Garcia</div>
+                            <div class="small text-muted">Dir. Operaciones, SuperFresh S.L.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 fade-in-up">
+                <div class="testimonial-card">
+                    <div class="stars mb-3">
+                        <i class="bi bi-star-fill"></i>
+                        <i class="bi bi-star-fill"></i>
+                        <i class="bi bi-star-fill"></i>
+                        <i class="bi bi-star-fill"></i>
+                        <i class="bi bi-star-fill"></i>
+                    </div>
+                    <p class="quote mb-4">"Como banco de alimentos, SurplusAI nos permite acceder a excedentes de calidad de forma rapida y organizada. La plataforma nos ha triplicado la capacidad de recogida sin aumentar personal."</p>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="testimonial-avatar" style="background:#dbeafe;color:#1e40af">JL</div>
+                        <div>
+                            <div class="fw-bold small">Javier Lopez</div>
+                            <div class="small text-muted">Director, Banco de Alimentos Valencia</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 fade-in-up">
+                <div class="testimonial-card">
+                    <div class="stars mb-3">
+                        <i class="bi bi-star-fill"></i>
+                        <i class="bi bi-star-fill"></i>
+                        <i class="bi bi-star-fill"></i>
+                        <i class="bi bi-star-fill"></i>
+                        <i class="bi bi-star-half"></i>
+                    </div>
+                    <p class="quote mb-4">"Gestionamos 3 restaurantes y la ley nos obligaba a documentar todos los excedentes. SurplusAI no solo nos ahorra horas de papeleo, sino que vendemos lo que antes ibamos a tirar."</p>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="testimonial-avatar" style="background:#fef3c7;color:#92400e">AR</div>
+                        <div>
+                            <div class="fw-bold small">Ana Rodriguez</div>
+                            <div class="small text-muted">Propietaria, Grupo Gastro Madrid</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ==================== CONTACT ==================== -->
+<section id="contacto" class="py-5" style="background:linear-gradient(135deg,var(--primary-dark) 0%,var(--primary) 100%);color:#fff">
+    <div class="container py-3">
+        <div class="row g-5 align-items-center">
+            <div class="col-lg-5 fade-in-up">
+                <h2 class="fw-800 mb-3" style="font-size:2rem;letter-spacing:-.5px">Empieza a reducir tu desperdicio alimentario hoy</h2>
+                <p class="opacity-75 mb-4">Contacta con nuestro equipo para una demo personalizada o resuelve tus dudas sobre la plataforma y el cumplimiento legal.</p>
+                <div class="d-flex flex-column gap-3">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="d-flex align-items-center justify-content-center rounded-circle" style="width:44px;height:44px;background:rgba(255,255,255,.1);flex-shrink:0">
+                            <i class="bi bi-envelope-fill"></i>
+                        </div>
+                        <div>
+                            <div class="small opacity-75">Email</div>
+                            <a href="mailto:info@surplusai.es" class="text-white text-decoration-none fw-semibold">info@surplusai.es</a>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="d-flex align-items-center justify-content-center rounded-circle" style="width:44px;height:44px;background:rgba(255,255,255,.1);flex-shrink:0">
+                            <i class="bi bi-telephone-fill"></i>
+                        </div>
+                        <div>
+                            <div class="small opacity-75">Telefono</div>
+                            <a href="tel:+34912345678" class="text-white text-decoration-none fw-semibold">+34 912 345 678</a>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="d-flex align-items-center justify-content-center rounded-circle" style="width:44px;height:44px;background:rgba(255,255,255,.1);flex-shrink:0">
+                            <i class="bi bi-geo-alt-fill"></i>
+                        </div>
+                        <div>
+                            <div class="small opacity-75">Direccion</div>
+                            <span class="fw-semibold">Madrid, Espana</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-7 fade-in-up">
+                <div class="contact-card">
+                    <h5 class="fw-bold mb-4" style="color:var(--primary-dark)"><i class="bi bi-send me-2"></i>Enviar mensaje</h5>
+                    <form id="contactForm" onsubmit="handleContact(event)">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold text-muted">Nombre</label>
+                                <input type="text" class="form-control" id="contactName" required placeholder="Tu nombre">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold text-muted">Empresa</label>
+                                <input type="text" class="form-control" id="contactCompany" placeholder="Tu empresa">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold text-muted">Email</label>
+                                <input type="email" class="form-control" id="contactEmail" required placeholder="tu@empresa.com">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold text-muted">Telefono</label>
+                                <input type="tel" class="form-control" id="contactPhone" placeholder="+34 600 000 000">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small fw-semibold text-muted">Mensaje</label>
+                                <textarea class="form-control" id="contactMessage" rows="4" required placeholder="Cuentanos como podemos ayudarte..."></textarea>
+                            </div>
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary-custom w-100 py-2" id="contactBtn">
+                                    <span class="spinner-border spinner-border-sm d-none me-1" id="contactSpinner"></span>
+                                    <i class="bi bi-send me-1"></i> Enviar mensaje
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ==================== FOOTER ==================== -->
+<footer class="footer">
+    <div class="container">
+        <div class="row g-4 mb-4">
+            <div class="col-lg-4">
+                <div class="footer-brand mb-3"><i class="bi bi-recycle me-2"></i>Surplus<span>AI</span></div>
+                <p class="small opacity-75 mb-3" style="max-width:320px">
+                    Marketplace B2B inteligente para la gestion y redistribucion de excedentes alimentarios.
+                    Tecnologia al servicio de la sostenibilidad.
+                </p>
+                <div class="d-flex gap-2">
+                    <a href="#" class="d-flex align-items-center justify-content-center rounded-circle" style="width:36px;height:36px;background:rgba(255,255,255,.08)" title="LinkedIn">
+                        <i class="bi bi-linkedin"></i>
+                    </a>
+                    <a href="#" class="d-flex align-items-center justify-content-center rounded-circle" style="width:36px;height:36px;background:rgba(255,255,255,.08)" title="Twitter">
+                        <i class="bi bi-twitter-x"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="col-6 col-lg-2">
+                <h6 class="fw-bold text-white mb-3">Plataforma</h6>
+                <ul class="footer-links">
+                    <li><a href="#marketplace">Marketplace</a></li>
+                    <li><a href="#dashboard">Dashboard</a></li>
+                    <li><a href="#precios">Precios</a></li>
+                    <li><a href="#como-funciona">Como funciona</a></li>
+                </ul>
+            </div>
+            <div class="col-6 col-lg-2">
+                <h6 class="fw-bold text-white mb-3">Legal</h6>
+                <ul class="footer-links">
+                    <li><a href="#ley">Ley 1/2025</a></li>
+                    <li><a href="#">Politica de privacidad</a></li>
+                    <li><a href="#">Aviso legal</a></li>
+                    <li><a href="#">RGPD</a></li>
+                </ul>
+            </div>
+            <div class="col-6 col-lg-2">
+                <h6 class="fw-bold text-white mb-3">Empresa</h6>
+                <ul class="footer-links">
+                    <li><a href="#contacto">Contacto</a></li>
+                    <li><a href="#">Sobre nosotros</a></li>
+                    <li><a href="#">Blog</a></li>
+                    <li><a href="#">Prensa</a></li>
+                </ul>
+            </div>
+            <div class="col-6 col-lg-2">
+                <h6 class="fw-bold text-white mb-3">Soporte</h6>
+                <ul class="footer-links">
+                    <li><a href="#">Centro de ayuda</a></li>
+                    <li><a href="#">Documentacion API</a></li>
+                    <li><a href="#">Estado del servicio</a></li>
+                    <li><a href="mailto:info@surplusai.es">info@surplusai.es</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <div class="row align-items-center gy-2">
+                <div class="col-md-6">
+                    <small class="opacity-60">&copy; 2025 ZHURONG SL. Todos los derechos reservados. CIF B21678081</small>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <small class="opacity-60">
+                        Desarrollado por <a href="https://aegis-ai.es" target="_blank" rel="noopener"><strong>AEGIS-AI</strong></a>
+                        &middot; Cumplimiento <strong>Ley 1/2025</strong>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</footer>
 
 <!-- ==================== AUTH MODAL ==================== -->
 <div class="modal fade" id="authModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title fw-bold"><i class="bi bi-shield-lock me-2 text-muted"></i>Acceso SurplusAI</h5>
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-shield-lock-fill me-2" style="color:var(--primary)"></i>Acceso a SurplusAI
+                </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body px-4 pb-4">
                 <ul class="nav auth-tabs mb-4 border-bottom" role="tablist">
                     <li class="nav-item" role="presentation">
                         <button class="nav-link active" id="tab-login" data-bs-toggle="tab" data-bs-target="#pane-login" role="tab">Iniciar sesion</button>
@@ -433,17 +1651,22 @@
                     <div class="tab-pane fade show active" id="pane-login" role="tabpanel">
                         <form id="formLogin" onsubmit="handleLogin(event)">
                             <div class="mb-3">
-                                <label class="form-label fw-semibold small">Email</label>
+                                <label class="form-label fw-semibold small">Email corporativo</label>
                                 <input type="email" class="form-control" id="loginEmail" required placeholder="tu@empresa.com" autocomplete="email">
                             </div>
                             <div class="mb-3">
                                 <label class="form-label fw-semibold small">Contrasena</label>
-                                <input type="password" class="form-control" id="loginPass" required placeholder="Tu contrasena" autocomplete="current-password">
+                                <div class="input-group">
+                                    <input type="password" class="form-control" id="loginPass" required placeholder="Tu contrasena" autocomplete="current-password">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('loginPass', this)">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                </div>
                             </div>
                             <div id="loginError" class="alert alert-danger d-none small py-2"></div>
                             <button type="submit" class="btn btn-primary-custom w-100 py-2" id="loginBtn">
                                 <span class="spinner-border spinner-border-sm d-none me-1" id="loginSpinner"></span>
-                                Iniciar sesion
+                                <i class="bi bi-box-arrow-in-right me-1"></i> Iniciar sesion
                             </button>
                         </form>
                     </div>
@@ -451,36 +1674,59 @@
                     <div class="tab-pane fade" id="pane-register" role="tabpanel">
                         <form id="formRegister" onsubmit="handleRegister(event)">
                             <div class="mb-3">
-                                <label class="form-label fw-semibold small">Nombre de empresa</label>
-                                <input type="text" class="form-control" id="regEmpresa" required placeholder="Mi Empresa S.L.">
+                                <label class="form-label fw-semibold small">Nombre completo</label>
+                                <input type="text" class="form-control" id="regNombre" required placeholder="Tu nombre completo">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold small">Empresa</label>
+                                <input type="text" class="form-control" id="regEmpresa" required placeholder="Nombre de tu empresa">
                             </div>
                             <div class="mb-3">
                                 <label class="form-label fw-semibold small">Email corporativo</label>
                                 <input type="email" class="form-control" id="regEmail" required placeholder="tu@empresa.com" autocomplete="email">
                             </div>
                             <div class="mb-3">
-                                <label class="form-label fw-semibold small">Contrasena</label>
-                                <input type="password" class="form-control" id="regPass" required minlength="6" placeholder="Min. 6 caracteres" autocomplete="new-password">
+                                <label class="form-label fw-semibold small">Telefono</label>
+                                <input type="tel" class="form-control" id="regTelefono" placeholder="+34 600 000 000">
                             </div>
-                            <div class="row g-3 mb-3">
-                                <div class="col-6">
-                                    <label class="form-label fw-semibold small">ID Empresa</label>
-                                    <input type="number" class="form-control" id="regEmpresaId" required placeholder="Ej: 1" min="1">
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold small">Contrasena</label>
+                                <div class="input-group">
+                                    <input type="password" class="form-control" id="regPass" required minlength="6" placeholder="Min. 6 caracteres" autocomplete="new-password">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('regPass', this)">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
                                 </div>
-                                <div class="col-6">
-                                    <label class="form-label fw-semibold small">Rol</label>
-                                    <select class="form-select" id="regRol">
-                                        <option value="generador">Generador</option>
-                                        <option value="receptor">Receptor</option>
-                                    </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold small">Tipo de cuenta</label>
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <input type="radio" class="btn-check" name="regTipo" id="tipoGen" value="generador" checked>
+                                        <label class="btn btn-outline-secondary w-100 py-2" for="tipoGen">
+                                            <i class="bi bi-building d-block mb-1"></i>
+                                            <span class="small fw-semibold">Generador</span>
+                                        </label>
+                                    </div>
+                                    <div class="col-6">
+                                        <input type="radio" class="btn-check" name="regTipo" id="tipoRec" value="receptor">
+                                        <label class="btn btn-outline-secondary w-100 py-2" for="tipoRec">
+                                            <i class="bi bi-shop d-block mb-1"></i>
+                                            <span class="small fw-semibold">Receptor</span>
+                                        </label>
+                                    </div>
                                 </div>
                             </div>
                             <div id="regError" class="alert alert-danger d-none small py-2"></div>
                             <div id="regSuccess" class="alert alert-success d-none small py-2"></div>
                             <button type="submit" class="btn btn-primary-custom w-100 py-2" id="regBtn">
                                 <span class="spinner-border spinner-border-sm d-none me-1" id="regSpinner"></span>
-                                Crear cuenta
+                                <i class="bi bi-person-plus me-1"></i> Crear cuenta
                             </button>
+                            <p class="text-muted text-center small mt-3 mb-0">
+                                Al registrarte aceptas la <a href="#" class="text-decoration-none" style="color:var(--primary)">politica de privacidad</a>
+                                y los <a href="#" class="text-decoration-none" style="color:var(--primary)">terminos de servicio</a>
+                            </p>
                         </form>
                     </div>
                 </div>
@@ -504,7 +1750,7 @@
     </div>
 </div>
 
-<!-- Toast -->
+<!-- ==================== TOAST ==================== -->
 <div class="toast-container position-fixed bottom-0 end-0 p-3">
     <div id="appToast" class="toast align-items-center border-0" role="alert" aria-live="assertive">
         <div class="d-flex">
@@ -514,25 +1760,6 @@
     </div>
 </div>
 
-<!-- ==================== FOOTER ==================== -->
-<footer class="footer">
-    <div class="container">
-        <div class="row align-items-center gy-3">
-            <div class="col-md-4">
-                <div class="footer-brand mb-1"><i class="bi bi-recycle me-2"></i>Surplus<span>AI</span></div>
-                <small>Marketplace B2B de excedentes alimentarios</small>
-            </div>
-            <div class="col-md-4 text-md-center">
-                <small>Cumplimiento <strong>Ley 1/2025</strong> de prevencion<br>de perdidas y desperdicio alimentario</small>
-            </div>
-            <div class="col-md-4 text-md-end">
-                <small>Desarrollado por <a href="https://aegis-ai.es" target="_blank"><strong>AEGIS-AI</strong></a></small><br>
-                <small class="opacity-75">&copy; 2026 Todos los derechos reservados</small>
-            </div>
-        </div>
-    </div>
-</footer>
-
 <!-- ==================== SCRIPTS ==================== -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
@@ -540,26 +1767,38 @@
 'use strict';
 
 // ===================== CONFIG =====================
-const API_BASE = 'https://surplusai-backend-production.up.railway.app';
-let authToken = localStorage.getItem('surplus_token') || null;
-let currentUser = null;
+// API_BASE is relative when the frontend is served from the FastAPI backend
+// (same origin). Override at runtime with `window.API_BASE = '...'` in a
+// script tag or devtools for local development against a remote backend.
+var API_BASE = (typeof window !== 'undefined' && window.API_BASE) || '';
+var authToken = localStorage.getItem('surplus_token') || null;
+var currentUser = null;
 try { currentUser = JSON.parse(localStorage.getItem('surplus_user')); } catch(e) {}
-let lotsData = [];
-let dashboardData = null;
-let chartTx = null;
-let chartCat = null;
+var lotsData = [];
+var chartTx = null;
+var chartCat = null;
+var chartGen = null;
+var statsRefreshInterval = null;
 
 // ===================== API HELPER =====================
-async function apiFetch(path, opts = {}) {
-    const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+async function apiFetch(path, opts) {
+    opts = opts || {};
+    var headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
     if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
-    const res = await fetch(API_BASE + path, { ...opts, headers });
-    if (!res.ok) {
-        let detail = 'Error del servidor (' + res.status + ')';
-        try { const err = await res.json(); detail = err.detail || err.message || detail; } catch(e) {}
-        throw new Error(detail);
+    try {
+        var res = await fetch(API_BASE + path, Object.assign({}, opts, { headers: headers }));
+        if (!res.ok) {
+            var detail = 'Error del servidor (' + res.status + ')';
+            try { var err = await res.json(); detail = err.detail || err.message || detail; } catch(e) {}
+            throw new Error(detail);
+        }
+        return res.json();
+    } catch (err) {
+        if (err.name === 'TypeError' && err.message.includes('fetch')) {
+            throw new Error('No se pudo conectar con el servidor. Verifica tu conexion.');
+        }
+        throw err;
     }
-    return res.json();
 }
 
 // ===================== FORMATTERS =====================
@@ -576,11 +1815,23 @@ function fmtEur(n) {
     return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(n);
 }
 
+function fmtDate(dateStr) {
+    if (!dateStr) return '--';
+    return new Date(dateStr).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function fmtDateTime(dateStr) {
+    if (!dateStr) return '--';
+    return new Date(dateStr).toLocaleString('es-ES', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
 function timeRemaining(dateStr) {
-    const diff = new Date(dateStr) - Date.now();
+    if (!dateStr) return { text: 'Sin fecha', urgent: false };
+    var diff = new Date(dateStr) - Date.now();
     if (diff <= 0) return { text: 'Expirado', urgent: true };
     var h = Math.floor(diff / 3600000);
     var d = Math.floor(h / 24);
+    if (d > 3) return { text: d + ' dias', urgent: false };
     if (d > 1) return { text: d + 'd ' + (h % 24) + 'h', urgent: false };
     if (d === 1) return { text: '1d ' + (h % 24) + 'h', urgent: true };
     if (h > 0) return { text: h + 'h', urgent: h < 6 };
@@ -601,7 +1852,7 @@ var catConfig = {
     lacteos:   { label: 'Lacteos',    icon: 'bi-droplet-half' },
     carnes:    { label: 'Carnes',     icon: 'bi-bullseye' },
     pescados:  { label: 'Pescados',   icon: 'bi-water' },
-    panaderia: { label: 'Panaderia',  icon: 'bi-bread-slice' },
+    panaderia: { label: 'Panaderia',  icon: 'bi-basket2-fill' },
     prepared:  { label: 'Preparados', icon: 'bi-box' },
     otros:     { label: 'Otros',      icon: 'bi-three-dots' }
 };
@@ -614,6 +1865,13 @@ var catColors = {
 function catBadge(cat) {
     var c = catConfig[cat] || catConfig.otros;
     return '<span class="cat-badge cat-' + (cat || 'otros') + '"><i class="bi ' + c.icon + '"></i> ' + c.label + '</span>';
+}
+
+function statusBadge(estado) {
+    estado = estado || 'activo';
+    var cls = 'status-' + estado;
+    var labels = { activo: 'Activo', adjudicado: 'Adjudicado', expirado: 'Expirado', completado: 'Completado' };
+    return '<span class="status-badge ' + cls + '">' + (labels[estado] || estado) + '</span>';
 }
 
 var usoLabels = {
@@ -633,8 +1891,21 @@ function showToast(msg, type) {
     var t = document.getElementById('appToast');
     t.className = 'toast align-items-center border-0 text-bg-' + (type === 'error' ? 'danger' : 'success');
     document.getElementById('toastMsg').textContent = msg;
-    bootstrap.Toast.getOrCreateInstance(t).show();
+    bootstrap.Toast.getOrCreateInstance(t, { delay: 4000 }).show();
 }
+
+// ===================== PASSWORD TOGGLE =====================
+window.togglePassword = function(inputId, btn) {
+    var input = document.getElementById(inputId);
+    var icon = btn.querySelector('i');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.className = 'bi bi-eye-slash';
+    } else {
+        input.type = 'password';
+        icon.className = 'bi bi-eye';
+    }
+};
 
 // ===================== AUTH =====================
 function updateAuthUI() {
@@ -643,7 +1914,7 @@ function updateAuthUI() {
     if (authToken && currentUser) {
         navAuth.classList.add('d-none');
         navUser.classList.remove('d-none');
-        document.getElementById('navUserName').textContent = currentUser.nombre_empresa || currentUser.email || 'Usuario';
+        document.getElementById('navUserName').textContent = currentUser.nombre || currentUser.empresa || currentUser.email || 'Usuario';
     } else {
         navAuth.classList.remove('d-none');
         navUser.classList.add('d-none');
@@ -652,13 +1923,14 @@ function updateAuthUI() {
 
 window.showAuthModal = function(tab) {
     var modal = new bootstrap.Modal(document.getElementById('authModal'));
-    // Reset forms
     document.getElementById('loginError').classList.add('d-none');
     document.getElementById('regError').classList.add('d-none');
     document.getElementById('regSuccess').classList.add('d-none');
     modal.show();
     if (tab === 'register') {
         setTimeout(function() { document.getElementById('tab-register').click(); }, 150);
+    } else {
+        setTimeout(function() { document.getElementById('tab-login').click(); }, 150);
     }
 };
 
@@ -671,14 +1943,16 @@ window.handleLogin = async function(e) {
     spinner.classList.remove('d-none');
     btn.disabled = true;
     try {
-        var email = document.getElementById('loginEmail').value;
+        var email = document.getElementById('loginEmail').value.trim();
+        var password = document.getElementById('loginPass').value;
+        if (!email || !password) throw new Error('Completa todos los campos');
         var data = await apiFetch('/auth/login', {
             method: 'POST',
-            body: JSON.stringify({ email: email, password: document.getElementById('loginPass').value })
+            body: JSON.stringify({ email: email, password: password })
         });
         authToken = data.access_token;
         localStorage.setItem('surplus_token', authToken);
-        currentUser = { email: email };
+        currentUser = { email: email, nombre: data.nombre || email };
         localStorage.setItem('surplus_user', JSON.stringify(currentUser));
         updateAuthUI();
         bootstrap.Modal.getInstance(document.getElementById('authModal')).hide();
@@ -704,20 +1978,31 @@ window.handleRegister = async function(e) {
     spinner.classList.remove('d-none');
     btn.disabled = true;
     try {
+        var nombre = document.getElementById('regNombre').value.trim();
+        var empresa = document.getElementById('regEmpresa').value.trim();
+        var email = document.getElementById('regEmail').value.trim();
+        var password = document.getElementById('regPass').value;
+        var telefono = document.getElementById('regTelefono').value.trim();
+        var tipo = document.querySelector('input[name="regTipo"]:checked').value;
+
+        if (!nombre || !empresa || !email || !password) throw new Error('Completa todos los campos obligatorios');
+        if (password.length < 6) throw new Error('La contrasena debe tener al menos 6 caracteres');
+
         await apiFetch('/auth/register', {
             method: 'POST',
             body: JSON.stringify({
-                email: document.getElementById('regEmail').value,
-                password: document.getElementById('regPass').value,
-                empresa_id: parseInt(document.getElementById('regEmpresaId').value),
-                nombre_empresa: document.getElementById('regEmpresa').value,
-                rol: document.getElementById('regRol').value
+                nombre: nombre,
+                email: email,
+                password: password,
+                tipo: tipo,
+                empresa: empresa,
+                telefono: telefono || null
             })
         });
         sucDiv.textContent = 'Cuenta creada con exito. Ya puedes iniciar sesion.';
         sucDiv.classList.remove('d-none');
         document.getElementById('formRegister').reset();
-        setTimeout(function() { document.getElementById('tab-login').click(); }, 2000);
+        setTimeout(function() { document.getElementById('tab-login').click(); }, 2500);
     } catch (err) {
         errDiv.textContent = err.message;
         errDiv.classList.remove('d-none');
@@ -734,144 +2019,226 @@ window.logout = function() {
     localStorage.removeItem('surplus_user');
     updateAuthUI();
     showToast('Sesion cerrada');
-    lotsData = [];
-    renderLots();
+    loadLots();
 };
 
-// ===================== STATS & DASHBOARD =====================
-async function loadStats() {
+// ===================== CONTACT FORM =====================
+window.handleContact = function(e) {
+    e.preventDefault();
+    var btn = document.getElementById('contactBtn');
+    var spinner = document.getElementById('contactSpinner');
+    spinner.classList.remove('d-none');
+    btn.disabled = true;
+    // Simulate send (no backend endpoint for contact)
+    setTimeout(function() {
+        spinner.classList.add('d-none');
+        btn.disabled = false;
+        showToast('Mensaje enviado correctamente. Te contactaremos pronto.');
+        document.getElementById('contactForm').reset();
+    }, 1200);
+};
+
+// ===================== STATS =====================
+async function loadHeroStats() {
+    try {
+        var results = await Promise.allSettled([
+            apiFetch('/generadores'),
+            apiFetch('/receptores'),
+            apiFetch('/lotes')
+        ]);
+
+        var generadores = results[0].status === 'fulfilled' ? results[0].value : [];
+        var receptores = results[1].status === 'fulfilled' ? results[1].value : [];
+        var lotes = results[2].status === 'fulfilled' ? results[2].value : [];
+
+        if (Array.isArray(generadores)) {
+            document.getElementById('heroGeneradores').textContent = fmtNum(generadores.length);
+            document.getElementById('statGen').textContent = fmtNum(generadores.length);
+        }
+        if (Array.isArray(receptores)) {
+            document.getElementById('heroReceptores').textContent = fmtNum(receptores.length);
+            document.getElementById('statRec').textContent = fmtNum(receptores.length);
+        }
+        if (Array.isArray(lotes)) {
+            document.getElementById('heroLotes').textContent = fmtNum(lotes.length);
+            document.getElementById('statLotes').textContent = fmtNum(lotes.length);
+
+            // Calculate derived stats
+            var totalKg = 0;
+            lotes.forEach(function(l) { totalKg += (l.cantidad_kg || 0); });
+            var co2 = Math.round(totalKg * 2.5); // approx 2.5 kg CO2 per kg food waste
+            document.getElementById('heroCO2').textContent = fmtNum(co2);
+            document.getElementById('statCO2').textContent = fmtNum(co2);
+            document.getElementById('statTx').textContent = fmtNum(lotes.filter(function(l) { return l.estado === 'adjudicado' || l.estado === 'completado'; }).length);
+
+            var totalMoney = 0;
+            lotes.forEach(function(l) { totalMoney += (l.precio_actual || l.precio_base || 0); });
+            document.getElementById('statMoney').textContent = fmtEur(totalMoney);
+
+            // Build charts from lots data
+            buildChartsFromLots(lotes, generadores);
+        }
+    } catch (e) {
+        console.warn('Stats load failed:', e.message);
+    }
+
+    // Also try /stats endpoint
     try {
         var s = await apiFetch('/stats');
-        document.getElementById('heroGeneradores').textContent = fmtNum(s.num_generadores);
-        document.getElementById('heroReceptores').textContent = fmtNum(s.num_receptores);
-        document.getElementById('heroKg').textContent = fmtNum(s.total_kg_saved);
-        document.getElementById('heroCO2').textContent = fmtNum(s.co2_avoided_kg);
-    } catch (e) { console.warn('Stats load failed:', e.message); }
-}
-
-async function loadDashboard() {
-    try {
-        dashboardData = await apiFetch('/dashboard');
-        var s = dashboardData.summary || {};
-        document.getElementById('statKg').textContent = fmtNum(s.total_kg_saved);
-        document.getElementById('statCO2').textContent = fmtNum(s.co2_avoided_kg);
-        document.getElementById('statTx').textContent = fmtNum(s.total_transactions);
-        document.getElementById('statMoney').textContent = fmtEur(s.money_transacted);
-        document.getElementById('statGen').textContent = fmtNum(s.num_generadores);
-        document.getElementById('statRec').textContent = fmtNum(s.num_receptores);
-        renderCharts();
-    } catch (e) { console.warn('Dashboard load failed:', e.message); }
-}
-
-function renderCharts() {
-    if (!dashboardData) return;
-
-    // === Transactions per day chart ===
-    var txData = (dashboardData.time_series && dashboardData.time_series.transactions_per_day) || {};
-    var txLabels = Object.keys(txData).sort();
-    var txValues = txLabels.map(function(k) { return txData[k]; });
-
-    if (chartTx) chartTx.destroy();
-    var ctxTx = document.getElementById('chartTx');
-
-    if (txLabels.length === 0) {
-        // Show placeholder chart with sample structure
-        chartTx = new Chart(ctxTx, {
-            type: 'bar',
-            data: {
-                labels: ['Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom'],
-                datasets: [{
-                    label: 'Transacciones',
-                    data: [0, 0, 0, 0, 0, 0, 0],
-                    backgroundColor: 'rgba(26,86,50,.15)',
-                    borderColor: 'rgba(26,86,50,.3)',
-                    borderWidth: 1, borderRadius: 6
-                }]
-            },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: { enabled: false }
-                },
-                scales: {
-                    y: { beginAtZero: true, max: 5, ticks: { stepSize: 1 }, grid: { color: '#f1f5f9' } },
-                    x: { grid: { display: false } }
-                }
+        if (s) {
+            if (s.num_generadores) document.getElementById('heroGeneradores').textContent = fmtNum(s.num_generadores);
+            if (s.num_receptores) document.getElementById('heroReceptores').textContent = fmtNum(s.num_receptores);
+            if (s.total_kg_saved) document.getElementById('statCO2').textContent = fmtNum(Math.round(s.total_kg_saved * 2.5));
+            if (s.co2_avoided_kg) {
+                document.getElementById('heroCO2').textContent = fmtNum(s.co2_avoided_kg);
+                document.getElementById('statCO2').textContent = fmtNum(s.co2_avoided_kg);
             }
-        });
-    } else {
-        chartTx = new Chart(ctxTx, {
-            type: 'bar',
+        }
+    } catch (e) { /* stats endpoint may not exist */ }
+}
+
+// ===================== CHARTS =====================
+function buildChartsFromLots(lotes, generadores) {
+    if (!lotes || !Array.isArray(lotes)) return;
+
+    // Category doughnut
+    var catCounts = {};
+    lotes.forEach(function(l) {
+        var cat = l.categoria || 'otros';
+        catCounts[cat] = (catCounts[cat] || 0) + 1;
+    });
+
+    var catLabels = Object.keys(catCounts);
+    var catValues = catLabels.map(function(k) { return catCounts[k]; });
+
+    if (chartCat) chartCat.destroy();
+    var ctxCat = document.getElementById('chartCat');
+    if (ctxCat) {
+        chartCat = new Chart(ctxCat, {
+            type: 'doughnut',
             data: {
-                labels: txLabels.map(function(d) {
-                    return new Date(d).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
-                }),
+                labels: catLabels.map(function(c) { var cc = catConfig[c]; return cc ? cc.label : c; }),
                 datasets: [{
-                    label: 'Transacciones',
-                    data: txValues,
-                    backgroundColor: 'rgba(26,86,50,.6)',
-                    borderColor: '#1a5632',
-                    borderWidth: 2, borderRadius: 6
+                    data: catValues.length > 0 ? catValues : [1,1,1,1],
+                    backgroundColor: catLabels.length > 0
+                        ? catLabels.map(function(c) { return catColors[c] || '#94a3b8'; })
+                        : ['#dcfce7','#dbeafe','#fef3c7','#f3e8ff'],
+                    borderWidth: 0,
+                    hoverOffset: 8
                 }]
             },
             options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#f1f5f9' } },
-                    x: { grid: { display: false } }
-                }
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { padding: 16, usePointStyle: true, pointStyleWidth: 10, font: { size: 12 } }
+                    },
+                    tooltip: { enabled: catLabels.length > 0 }
+                },
+                cutout: '68%'
             }
         });
     }
 
-    // === Category doughnut chart ===
-    var catData = dashboardData.categories || {};
-    var catLabels = Object.keys(catData);
-    var catValues = catLabels.map(function(k) { return catData[k]; });
+    // Activity line chart (lots by creation date)
+    var dateMap = {};
+    lotes.forEach(function(l) {
+        var d = (l.created_at || l.fecha_publicacion || '').substring(0, 10);
+        if (d) dateMap[d] = (dateMap[d] || 0) + 1;
+    });
+    var txLabels = Object.keys(dateMap).sort().slice(-14);
+    var txValues = txLabels.map(function(k) { return dateMap[k]; });
 
-    if (chartCat) chartCat.destroy();
-    var ctxCat = document.getElementById('chartCat');
-
-    if (catLabels.length === 0) {
-        // Placeholder
-        chartCat = new Chart(ctxCat, {
-            type: 'doughnut',
+    if (chartTx) chartTx.destroy();
+    var ctxTx = document.getElementById('chartTx');
+    if (ctxTx) {
+        chartTx = new Chart(ctxTx, {
+            type: 'line',
             data: {
-                labels: Object.keys(catConfig).map(function(k) { return catConfig[k].label; }),
+                labels: txLabels.length > 0
+                    ? txLabels.map(function(d) { return new Date(d).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }); })
+                    : ['Lun','Mar','Mie','Jue','Vie','Sab','Dom'],
                 datasets: [{
-                    data: [1, 1, 1, 1, 1, 1, 1, 1],
-                    backgroundColor: Object.keys(catConfig).map(function(k) { return catColors[k] + '30'; }),
-                    borderWidth: 0
+                    label: 'Lotes publicados',
+                    data: txValues.length > 0 ? txValues : [0,0,0,0,0,0,0],
+                    borderColor: '#1a5632',
+                    backgroundColor: 'rgba(26,86,50,.08)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: .4,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#1a5632',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointHoverRadius: 7
                 }]
             },
             options: {
-                responsive: true, maintainAspectRatio: false,
+                responsive: true,
+                maintainAspectRatio: false,
                 plugins: {
-                    legend: { position: 'bottom', labels: { padding: 12, usePointStyle: true, pointStyleWidth: 10, font: { size: 11 } } },
-                    tooltip: { enabled: false }
+                    legend: { display: false },
+                    tooltip: { enabled: txValues.length > 0 }
                 },
-                cutout: '65%'
+                scales: {
+                    y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#f1f5f9' } },
+                    x: { grid: { display: false } }
+                },
+                interaction: { mode: 'index', intersect: false }
             }
         });
-    } else {
-        chartCat = new Chart(ctxCat, {
-            type: 'doughnut',
+    }
+
+    // Top generators bar chart
+    var genMap = {};
+    lotes.forEach(function(l) {
+        var genId = l.generador_id || 'Desconocido';
+        genMap[genId] = (genMap[genId] || 0) + (l.cantidad_kg || 0);
+    });
+    var genEntries = Object.entries(genMap).sort(function(a,b) { return b[1] - a[1]; }).slice(0, 8);
+
+    // Try to map generator IDs to names
+    var genNames = {};
+    if (generadores && Array.isArray(generadores)) {
+        generadores.forEach(function(g) {
+            genNames[g.id] = g.nombre || g.empresa || ('Gen #' + g.id);
+        });
+    }
+
+    if (chartGen) chartGen.destroy();
+    var ctxGen = document.getElementById('chartGenerators');
+    if (ctxGen) {
+        chartGen = new Chart(ctxGen, {
+            type: 'bar',
             data: {
-                labels: catLabels.map(function(c) { return c.charAt(0).toUpperCase() + c.slice(1); }),
+                labels: genEntries.length > 0
+                    ? genEntries.map(function(e) { return genNames[e[0]] || ('Generador #' + e[0]); })
+                    : ['Sin datos'],
                 datasets: [{
-                    data: catValues,
-                    backgroundColor: catLabels.map(function(c) { return catColors[c] || '#94a3b8'; }),
-                    borderWidth: 0
+                    label: 'Kg de excedentes',
+                    data: genEntries.length > 0 ? genEntries.map(function(e) { return e[1]; }) : [0],
+                    backgroundColor: genEntries.map(function(_, i) {
+                        var colors = ['rgba(26,86,50,.8)', 'rgba(26,86,50,.65)', 'rgba(26,86,50,.5)', 'rgba(26,86,50,.4)',
+                                      'rgba(26,86,50,.3)', 'rgba(26,86,50,.25)', 'rgba(26,86,50,.2)', 'rgba(26,86,50,.15)'];
+                        return colors[i] || colors[colors.length - 1];
+                    }),
+                    borderRadius: 6,
+                    borderSkipped: false
                 }]
             },
             options: {
-                responsive: true, maintainAspectRatio: false,
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
                 plugins: {
-                    legend: { position: 'bottom', labels: { padding: 12, usePointStyle: true, pointStyleWidth: 10, font: { size: 11 } } }
+                    legend: { display: false }
                 },
-                cutout: '65%'
+                scales: {
+                    x: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { callback: function(v) { return fmtNum(v) + ' kg'; } } },
+                    y: { grid: { display: false } }
+                }
             }
         });
     }
@@ -882,7 +2249,7 @@ async function loadLots() {
     var container = document.getElementById('lotsContainer');
     container.innerHTML = '<div class="spinner-overlay"><div class="spinner-border" role="status"><span class="visually-hidden">Cargando...</span></div></div>';
     try {
-        lotsData = await apiFetch('/lots');
+        lotsData = await apiFetch('/lotes');
         if (!Array.isArray(lotsData)) lotsData = [];
         renderLots();
     } catch (e) {
@@ -890,9 +2257,9 @@ async function loadLots() {
         if (msg.includes('401') || msg.toLowerCase().includes('auth') || msg.toLowerCase().includes('token') || msg.toLowerCase().includes('not authenticated')) {
             container.innerHTML =
                 '<div class="empty-state">' +
-                    '<i class="bi bi-lock d-block"></i>' +
-                    '<h5 class="mt-2">Acceso requerido</h5>' +
-                    '<p class="small">Inicia sesion o registrate para ver los lotes disponibles</p>' +
+                    '<i class="bi bi-lock-fill d-block" style="color:var(--primary)"></i>' +
+                    '<h5 class="mt-2 fw-bold">Acceso requerido</h5>' +
+                    '<p class="small">Inicia sesion o registrate para explorar los lotes disponibles</p>' +
                     '<button class="btn btn-primary-custom" onclick="showAuthModal()">' +
                         '<i class="bi bi-box-arrow-in-right me-1"></i> Acceder' +
                     '</button>' +
@@ -900,10 +2267,10 @@ async function loadLots() {
         } else {
             container.innerHTML =
                 '<div class="empty-state">' +
-                    '<i class="bi bi-exclamation-triangle d-block"></i>' +
-                    '<h5 class="mt-2">Error cargando lotes</h5>' +
+                    '<i class="bi bi-exclamation-triangle d-block" style="color:var(--secondary)"></i>' +
+                    '<h5 class="mt-2 fw-bold">Error cargando lotes</h5>' +
                     '<p class="small text-muted">' + escHtml(msg) + '</p>' +
-                    '<button class="btn btn-sm btn-primary-custom" onclick="loadLots()">Reintentar</button>' +
+                    '<button class="btn btn-sm btn-primary-custom" onclick="loadLots()"><i class="bi bi-arrow-clockwise me-1"></i> Reintentar</button>' +
                 '</div>';
         }
     }
@@ -918,7 +2285,6 @@ function renderLots() {
     var lots = lotsData.slice();
     if (filterCat) lots = lots.filter(function(l) { return l.categoria === filterCat; });
 
-    // Sort
     switch (filterSort) {
         case 'price_asc':
             lots.sort(function(a, b) { return (a.precio_actual || a.precio_base || 0) - (b.precio_actual || b.precio_base || 0); });
@@ -929,47 +2295,45 @@ function renderLots() {
         case 'expiry':
             lots.sort(function(a, b) { return new Date(a.fecha_limite) - new Date(b.fecha_limite); });
             break;
-        case 'bids':
-            lots.sort(function(a, b) { return (b.num_bids || 0) - (a.num_bids || 0); });
-            break;
-        default: // recent
+        default:
             lots.sort(function(a, b) { return new Date(b.created_at || b.fecha_publicacion) - new Date(a.created_at || a.fecha_publicacion); });
     }
 
     if (!lots || lots.length === 0) {
         container.innerHTML =
             '<div class="empty-state">' +
-                '<i class="bi bi-inbox d-block"></i>' +
-                '<h5 class="mt-2">No hay lotes disponibles</h5>' +
+                '<i class="bi bi-inbox d-block" style="color:var(--primary);opacity:.5"></i>' +
+                '<h5 class="mt-2 fw-bold" style="color:var(--text)">No hay lotes disponibles</h5>' +
                 '<p class="small text-muted">' + (filterCat ? 'Prueba con otra categoria o quita el filtro' : 'Los lotes apareceran aqui cuando se publiquen') + '</p>' +
             '</div>';
         return;
     }
 
     var html = '<div class="row g-3">';
-    lots.forEach(function(lot) {
+    lots.forEach(function(lot, idx) {
         var tr = timeRemaining(lot.fecha_limite);
+        var generatorName = lot.generador_nombre || lot.empresa_generador || ('Generador #' + (lot.generador_id || '?'));
         html +=
             '<div class="col-sm-6 col-lg-4 col-xl-3">' +
-                '<div class="lot-card" onclick="openLotDetail(' + lot.id + ')">' +
+                '<div class="lot-card" onclick="openLotDetail(' + lot.id + ')" style="animation:fadeInUp .5s ease-out ' + (idx * .05) + 's backwards">' +
                     '<div class="lot-card-header">' +
                         catBadge(lot.categoria) +
                         '<span class="time-badge ' + (tr.urgent ? 'urgent' : 'ok') + '">' +
-                            '<i class="bi bi-clock me-1"></i>' + tr.text +
+                            '<i class="bi bi-clock"></i> ' + tr.text +
                         '</span>' +
                     '</div>' +
                     '<div class="lot-card-body">' +
-                        '<h6 class="fw-bold mb-1">' + escHtml(lot.producto) + '</h6>' +
-                        '<div class="text-muted small"><i class="bi bi-box me-1"></i>' + fmtNum(lot.cantidad_kg, 1) + ' kg</div>' +
+                        '<h6 class="fw-bold mb-1">' + escHtml(lot.producto || 'Lote #' + lot.id) + '</h6>' +
+                        '<div class="text-muted small mb-1"><i class="bi bi-building me-1"></i>' + escHtml(generatorName) + '</div>' +
                         '<div class="lot-meta">' +
+                            '<span class="lot-meta-item"><i class="bi bi-box-seam"></i> ' + fmtNum(lot.cantidad_kg, 1) + ' kg</span>' +
                             (lot.temperatura_conservacion != null ? '<span class="lot-meta-item"><i class="bi bi-thermometer-half"></i> ' + lot.temperatura_conservacion + ' C</span>' : '') +
-                            (lot.lote_origen ? '<span class="lot-meta-item"><i class="bi bi-upc-scan"></i> ' + escHtml(lot.lote_origen) + '</span>' : '') +
-                            '<span class="lot-meta-item"><i class="bi bi-chat-dots"></i> ' + (lot.num_bids || 0) + ' pujas</span>' +
+                            '<span class="lot-meta-item"><i class="bi bi-calendar3"></i> ' + fmtDate(lot.fecha_limite) + '</span>' +
                         '</div>' +
                     '</div>' +
                     '<div class="lot-card-footer">' +
                         '<div class="lot-price">' + fmtEur(lot.precio_actual || lot.precio_base) + ' <small>/lote</small></div>' +
-                        '<span class="badge bg-' + (lot.estado === 'activo' ? 'success' : lot.estado === 'adjudicado' ? 'primary' : 'secondary') + '">' + (lot.estado || 'activo') + '</span>' +
+                        statusBadge(lot.estado) +
                     '</div>' +
                 '</div>' +
             '</div>';
@@ -987,42 +2351,47 @@ window.openLotDetail = async function(lotId) {
     modal.show();
 
     var lot = lotsData.find(function(l) { return l.id === lotId; });
-    if (!lot) { body.innerHTML = '<div class="empty-state"><i class="bi bi-question-circle d-block"></i><p>Lote no encontrado</p></div>'; return; }
 
-    document.getElementById('lotModalTitle').textContent = lot.producto;
+    // Try to get detail from API
+    try {
+        var detail = await apiFetch('/lotes/' + lotId);
+        if (detail) lot = detail;
+    } catch (e) { /* use cached data */ }
+
+    if (!lot) {
+        body.innerHTML = '<div class="empty-state"><i class="bi bi-question-circle d-block"></i><p>Lote no encontrado</p></div>';
+        return;
+    }
+
+    document.getElementById('lotModalTitle').textContent = lot.producto || 'Lote #' + lot.id;
 
     // Load bids
     var bidsHtml = '';
     try {
         var bids = await apiFetch('/bids/' + lotId);
         if (bids && bids.length > 0) {
-            bidsHtml = '<h6 class="fw-bold mt-4 mb-3"><i class="bi bi-chat-left-text me-2 text-muted"></i>Pujas recibidas (' + bids.length + ')</h6>';
+            bidsHtml = '<h6 class="fw-bold mt-4 mb-3"><i class="bi bi-chat-left-text me-2" style="color:var(--primary)"></i>Pujas recibidas (' + bids.length + ')</h6>';
             bids.forEach(function(b) {
                 bidsHtml +=
                     '<div class="bid-card">' +
                         '<div class="d-flex justify-content-between align-items-center mb-1">' +
-                            '<span class="bid-price">' + fmtEur(b.precio_oferta) + '</span>' +
+                            '<span class="bid-price">' + fmtEur(b.precio_oferta || b.monto) + '</span>' +
                             '<span class="bid-status bid-' + (b.estado || 'pendiente') + '">' + (b.estado || 'pendiente') + '</span>' +
                         '</div>' +
-                        '<div class="small text-muted"><strong>Uso previsto:</strong> ' + (usoLabels[b.uso_previsto] || 'No especificado') + '</div>' +
+                        (b.uso_previsto ? '<div class="small text-muted"><strong>Uso:</strong> ' + (usoLabels[b.uso_previsto] || 'No especificado') + '</div>' : '') +
                         (b.mensaje ? '<div class="small text-muted mt-1"><i class="bi bi-chat-dots me-1"></i>' + escHtml(b.mensaje) + '</div>' : '') +
-                        '<div class="small text-muted mt-1 opacity-75"><i class="bi bi-clock me-1"></i>' + new Date(b.created_at).toLocaleString('es-ES') + '</div>' +
+                        '<div class="small text-muted mt-1 opacity-75"><i class="bi bi-clock me-1"></i>' + fmtDateTime(b.created_at) + '</div>' +
                     '</div>';
             });
         } else {
-            bidsHtml = '<div class="text-muted small mt-4 mb-2"><i class="bi bi-chat-left me-1"></i> Sin pujas todavia. Se el primero en pujar.</div>';
+            bidsHtml = '<div class="text-center py-3 mt-3"><i class="bi bi-chat-left d-block mb-2" style="font-size:1.5rem;color:var(--primary);opacity:.3"></i><p class="small text-muted mb-0">Sin pujas todavia. Se el primero en pujar.</p></div>';
         }
     } catch (e) {
         bidsHtml = '<div class="text-muted small mt-4"><i class="bi bi-exclamation-circle me-1"></i> No se pudieron cargar las pujas.</div>';
     }
 
     var tr = timeRemaining(lot.fecha_limite);
-
-    // Build uso options
-    var usoOptions = '';
-    for (var k in usoLabels) {
-        usoOptions += '<option value="' + k + '">' + usoLabels[k] + '</option>';
-    }
+    var generatorName = lot.generador_nombre || lot.empresa_generador || ('Generador #' + (lot.generador_id || '?'));
 
     // Build bid form
     var bidFormHtml = '';
@@ -1030,21 +2399,13 @@ window.openLotDetail = async function(lotId) {
         bidFormHtml =
             '<form onsubmit="submitBid(event, ' + lot.id + ')" id="bidForm">' +
                 '<div class="mb-3">' +
-                    '<label class="form-label small fw-semibold">Precio oferta (EUR)</label>' +
+                    '<label class="form-label small fw-semibold">Importe de tu oferta (EUR)</label>' +
                     '<input type="number" class="form-control" id="bidPrice" step="0.01" min="0.01" required ' +
                         'placeholder="Ej: ' + ((lot.precio_actual || lot.precio_base || 100)).toFixed(2) + '">' +
                 '</div>' +
                 '<div class="mb-3">' +
-                    '<label class="form-label small fw-semibold">ID Receptor</label>' +
-                    '<input type="number" class="form-control" id="bidReceptor" min="1" required placeholder="Tu ID de receptor">' +
-                '</div>' +
-                '<div class="mb-3">' +
-                    '<label class="form-label small fw-semibold">Uso previsto</label>' +
-                    '<select class="form-select" id="bidUso" required>' + usoOptions + '</select>' +
-                '</div>' +
-                '<div class="mb-3">' +
                     '<label class="form-label small fw-semibold">Mensaje <span class="text-muted fw-normal">(opcional)</span></label>' +
-                    '<textarea class="form-control" id="bidMsg" rows="2" placeholder="Comentarios adicionales..."></textarea>' +
+                    '<textarea class="form-control" id="bidMsg" rows="2" placeholder="Detalles adicionales sobre tu oferta..."></textarea>' +
                 '</div>' +
                 '<div id="bidError" class="alert alert-danger d-none small py-2"></div>' +
                 '<button type="submit" class="btn btn-primary-custom w-100 py-2" id="bidBtn">' +
@@ -1054,10 +2415,12 @@ window.openLotDetail = async function(lotId) {
             '</form>';
     } else {
         bidFormHtml =
-            '<p class="text-muted small mb-3">Inicia sesion para hacer una puja en este lote.</p>' +
-            '<button class="btn btn-primary-custom btn-sm w-100" onclick="bootstrap.Modal.getInstance(document.getElementById(\'lotModal\')).hide(); showAuthModal();">' +
-                '<i class="bi bi-box-arrow-in-right me-1"></i> Acceder' +
-            '</button>';
+            '<div class="text-center py-2">' +
+                '<p class="text-muted small mb-3">Inicia sesion para hacer una puja en este lote</p>' +
+                '<button class="btn btn-primary-custom w-100" onclick="bootstrap.Modal.getInstance(document.getElementById(\'lotModal\')).hide(); showAuthModal();">' +
+                    '<i class="bi bi-box-arrow-in-right me-1"></i> Acceder' +
+                '</button>' +
+            '</div>';
     }
 
     body.innerHTML =
@@ -1065,35 +2428,33 @@ window.openLotDetail = async function(lotId) {
             '<div class="col-md-7">' +
                 '<div class="d-flex gap-2 mb-3 flex-wrap align-items-center">' +
                     catBadge(lot.categoria) +
-                    '<span class="badge bg-' + (lot.estado === 'activo' ? 'success' : 'secondary') + '">' + (lot.estado || 'activo') + '</span>' +
+                    statusBadge(lot.estado) +
                     '<span class="time-badge ' + (tr.urgent ? 'urgent' : 'ok') + '"><i class="bi bi-clock me-1"></i>' + tr.text + '</span>' +
                 '</div>' +
 
                 '<div class="row g-3 mb-3">' +
                     '<div class="col-6">' +
                         '<div class="stat-card p-3 text-center">' +
-                            '<div class="small text-muted mb-1">Cantidad</div>' +
+                            '<div class="small text-muted mb-1"><i class="bi bi-box-seam me-1"></i>Cantidad</div>' +
                             '<div class="fw-bold fs-5">' + fmtNum(lot.cantidad_kg, 1) + ' kg</div>' +
                         '</div>' +
                     '</div>' +
                     '<div class="col-6">' +
                         '<div class="stat-card p-3 text-center">' +
-                            '<div class="small text-muted mb-1">Precio base</div>' +
-                            '<div class="fw-bold fs-5" style="color:var(--primary)">' + fmtEur(lot.precio_base) + '</div>' +
+                            '<div class="small text-muted mb-1"><i class="bi bi-tag me-1"></i>Precio</div>' +
+                            '<div class="fw-bold fs-5" style="color:var(--primary)">' + fmtEur(lot.precio_actual || lot.precio_base) + '</div>' +
                         '</div>' +
                     '</div>' +
                 '</div>' +
 
-                '<table class="table table-sm mb-0">' +
+                '<table class="table table-sm small mb-0">' +
                     '<tbody>' +
-                        '<tr><td class="text-muted" style="width:40%">Precio actual</td><td class="fw-semibold">' + fmtEur(lot.precio_actual) + '</td></tr>' +
-                        '<tr><td class="text-muted">Fecha limite</td><td>' + new Date(lot.fecha_limite).toLocaleString('es-ES') + '</td></tr>' +
-                        '<tr><td class="text-muted">Publicado</td><td>' + new Date(lot.fecha_publicacion).toLocaleString('es-ES') + '</td></tr>' +
-                        (lot.temperatura_conservacion != null ? '<tr><td class="text-muted">Temperatura</td><td>' + lot.temperatura_conservacion + ' C</td></tr>' : '') +
-                        (lot.lote_origen ? '<tr><td class="text-muted">Lote origen</td><td>' + escHtml(lot.lote_origen) + '</td></tr>' : '') +
-                        '<tr><td class="text-muted">Generador</td><td>#' + lot.generador_id + '</td></tr>' +
-                        '<tr><td class="text-muted">N. pujas</td><td>' + (lot.num_bids || 0) + '</td></tr>' +
-                        (lot.precio_oferta_mas_alta ? '<tr><td class="text-muted">Oferta mas alta</td><td class="fw-bold" style="color:var(--primary)">' + fmtEur(lot.precio_oferta_mas_alta) + '</td></tr>' : '') +
+                        '<tr><td class="text-muted" style="width:42%"><i class="bi bi-building me-1"></i>Generador</td><td class="fw-semibold">' + escHtml(generatorName) + '</td></tr>' +
+                        '<tr><td class="text-muted"><i class="bi bi-calendar-event me-1"></i>Fecha limite</td><td>' + fmtDateTime(lot.fecha_limite) + '</td></tr>' +
+                        '<tr><td class="text-muted"><i class="bi bi-calendar-plus me-1"></i>Publicado</td><td>' + fmtDateTime(lot.fecha_publicacion || lot.created_at) + '</td></tr>' +
+                        (lot.temperatura_conservacion != null ? '<tr><td class="text-muted"><i class="bi bi-thermometer-half me-1"></i>Temperatura</td><td>' + lot.temperatura_conservacion + ' C</td></tr>' : '') +
+                        (lot.lote_origen ? '<tr><td class="text-muted"><i class="bi bi-upc-scan me-1"></i>Lote origen</td><td>' + escHtml(lot.lote_origen) + '</td></tr>' : '') +
+                        (lot.precio_oferta_mas_alta ? '<tr><td class="text-muted"><i class="bi bi-trophy me-1"></i>Oferta mas alta</td><td class="fw-bold" style="color:var(--primary)">' + fmtEur(lot.precio_oferta_mas_alta) + '</td></tr>' : '') +
                     '</tbody>' +
                 '</table>' +
 
@@ -1101,8 +2462,8 @@ window.openLotDetail = async function(lotId) {
             '</div>' +
 
             '<div class="col-md-5">' +
-                '<div class="card border-0 rounded-3 p-3" style="background:#f0fdf4">' +
-                    '<h6 class="fw-bold mb-3"><i class="bi bi-send me-2 text-muted"></i>Hacer una puja</h6>' +
+                '<div class="rounded-3 p-3" style="background:var(--primary-50);border:1px solid #dcfce7">' +
+                    '<h6 class="fw-bold mb-3"><i class="bi bi-send me-2" style="color:var(--primary)"></i>Hacer una puja</h6>' +
                     bidFormHtml +
                 '</div>' +
             '</div>' +
@@ -1119,18 +2480,19 @@ window.submitBid = async function(e, lotId) {
     btn.disabled = true;
 
     try {
+        var monto = parseFloat(document.getElementById('bidPrice').value);
+        var mensaje = document.getElementById('bidMsg').value || null;
+        if (!monto || monto <= 0) throw new Error('Introduce un importe valido');
+
         await apiFetch('/bids', {
             method: 'POST',
             body: JSON.stringify({
                 lote_id: lotId,
-                receptor_id: parseInt(document.getElementById('bidReceptor').value),
-                precio_oferta: parseFloat(document.getElementById('bidPrice').value),
-                uso_previsto: parseInt(document.getElementById('bidUso').value),
-                mensaje: document.getElementById('bidMsg').value || null
+                monto: monto,
+                mensaje: mensaje
             })
         });
         showToast('Puja enviada correctamente');
-        // Refresh detail and lots
         openLotDetail(lotId);
         loadLots();
     } catch (err) {
@@ -1142,29 +2504,325 @@ window.submitBid = async function(e, lotId) {
     }
 };
 
-// ===================== NAV SCROLL TRACKING =====================
-function setupNavTracking() {
+// ===================== SCROLL ANIMATIONS =====================
+function setupScrollAnimations() {
+    var observer = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('visible');
+            }
+        });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.fade-in-up').forEach(function(el) {
+        observer.observe(el);
+    });
+}
+
+// ===================== NAVBAR SCROLL =====================
+function setupNavScroll() {
+    var nav = document.getElementById('mainNav');
     var sections = document.querySelectorAll('section[id]');
     var navLinks = document.querySelectorAll('.nav-link[data-nav]');
+
     window.addEventListener('scroll', function() {
+        // Navbar shadow
+        if (window.scrollY > 20) {
+            nav.classList.add('scrolled');
+        } else {
+            nav.classList.remove('scrolled');
+        }
+
+        // Active section tracking
         var scrollY = window.scrollY;
         var current = '';
         sections.forEach(function(s) {
-            if (scrollY >= s.offsetTop - 120) current = s.id;
+            if (scrollY >= s.offsetTop - 150) current = s.id;
         });
         navLinks.forEach(function(l) {
             l.classList.toggle('active', l.getAttribute('data-nav') === current);
         });
     }, { passive: true });
+
+    // Close mobile menu on link click
+    navLinks.forEach(function(link) {
+        link.addEventListener('click', function() {
+            var collapse = document.getElementById('navMain');
+            var bsCollapse = bootstrap.Collapse.getInstance(collapse);
+            if (bsCollapse) bsCollapse.hide();
+        });
+    });
+}
+
+// ===================== MAP VIEW (Leaflet + markercluster) =====================
+// Parallel "mapa" rendering for the marketplace. Uses OpenStreetMap tiles
+// (no API key) and clusters pins in dense areas (Madrid / BCN). Prioritises
+// "lo más cercano" for small lots (<50 kg) by letting the backend auto-cap
+// the radius at 25 km — see GET /lots/nearby.
+
+var _map = null;
+var _mapCluster = null;
+var _userMarker = null;
+var _userCircle = null;
+var _nearbyAbort = null;
+var _mapInitialised = false;
+var _currentView = 'list';
+
+function setMarketplaceView(view) {
+    _currentView = view === 'map' ? 'map' : 'list';
+    var listEl = document.getElementById('lotsContainer');
+    var mapEl = document.getElementById('mapPanel');
+    var btnList = document.getElementById('viewToggleList');
+    var btnMap = document.getElementById('viewToggleMap');
+    if (_currentView === 'map') {
+        listEl.style.display = 'none';
+        mapEl.style.display = '';
+        btnList.classList.remove('active'); btnList.setAttribute('aria-selected', 'false');
+        btnMap.classList.add('active'); btnMap.setAttribute('aria-selected', 'true');
+        initMapOnce();
+        // Leaflet needs a size recalc after being un-hidden.
+        setTimeout(function() { if (_map) _map.invalidateSize(); }, 80);
+        loadNearbyLots();
+    } else {
+        mapEl.style.display = 'none';
+        listEl.style.display = '';
+        btnMap.classList.remove('active'); btnMap.setAttribute('aria-selected', 'false');
+        btnList.classList.add('active'); btnList.setAttribute('aria-selected', 'true');
+    }
+}
+window.setMarketplaceView = setMarketplaceView;
+
+function onFilterChange() {
+    if (_currentView === 'map') loadNearbyLots();
+    else renderLots();
+}
+window.onFilterChange = onFilterChange;
+
+function refreshMarketplace() {
+    if (_currentView === 'map') loadNearbyLots();
+    else loadLots();
+}
+window.refreshMarketplace = refreshMarketplace;
+
+function onMapControlChange() {
+    var radius = document.getElementById('mapRadius').value;
+    document.getElementById('mapRadiusVal').textContent = radius + ' km';
+    var w = parseInt(document.getElementById('mapMaxWeight').value, 10);
+    var wEl = document.getElementById('mapMaxWeightVal');
+    var hint = document.getElementById('mapWeightHint');
+    if (!w || w <= 0) {
+        wEl.textContent = 'Cualquiera';
+        hint.textContent = 'Los lotes pequeños priorizan cercanía logística.';
+    } else if (w < 50) {
+        wEl.textContent = '< ' + w + ' kg';
+        hint.textContent = 'Lote pequeño — el servidor capará el radio a 25 km.';
+    } else if (w <= 500) {
+        wEl.textContent = '≤ ' + w + ' kg';
+        hint.textContent = 'Lote mediano — radio máximo efectivo 100 km.';
+    } else {
+        wEl.textContent = '≤ ' + w + ' kg';
+        hint.textContent = 'Lote grande — reparto nacional.';
+    }
+}
+window.onMapControlChange = onMapControlChange;
+
+function initMapOnce() {
+    if (_mapInitialised) return;
+    if (typeof L === 'undefined') {
+        // Leaflet is deferred; if user clicks before it's ready, retry shortly.
+        setTimeout(initMapOnce, 120);
+        return;
+    }
+    _map = L.map('lotsMap', { scrollWheelZoom: false, keyboard: true })
+        .setView([40.4168, -3.7038], 6);
+    L.control.scale({ imperial: false }).addTo(_map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 18,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(_map);
+    _mapCluster = (typeof L.markerClusterGroup === 'function')
+        ? L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 50 })
+        : L.layerGroup();
+    _mapCluster.addTo(_map);
+    // Enable wheel zoom once the user focuses the map (accessibility: keyboard
+    // nav works; wheel stays off until engaged so the page scroll isn't hijacked).
+    _map.on('focus click', function() { _map.scrollWheelZoom.enable(); });
+    _map.on('blur', function() { _map.scrollWheelZoom.disable(); });
+    _mapInitialised = true;
+}
+
+function pinIconForCategory(cat) {
+    var color = (catColors && catColors[cat]) || '#1a5632';
+    var svg =
+        '<svg xmlns="http://www.w3.org/2000/svg" width="30" height="38" viewBox="0 0 30 38">' +
+            '<path d="M15 1C7.8 1 2 6.8 2 14c0 9.5 13 23 13 23s13-13.5 13-23C28 6.8 22.2 1 15 1z" ' +
+                'fill="' + color + '" stroke="#fff" stroke-width="2"/>' +
+            '<circle cx="15" cy="14" r="5" fill="#fff"/>' +
+        '</svg>';
+    return L.divIcon({
+        className: 'pin-marker',
+        html: svg,
+        iconSize: [30, 38],
+        iconAnchor: [15, 36],
+        popupAnchor: [0, -30]
+    });
+}
+
+function lotPopupHtml(lot) {
+    var cat = (catConfig[lot.categoria] || catConfig.otros).label;
+    var kg = fmtNum(lot.cantidad_kg, 1);
+    var price = fmtEur(lot.precio_actual || lot.precio_base);
+    var tr = timeRemaining(lot.fecha_limite);
+    var dist = (lot.distancia_km != null) ? (fmtNum(lot.distancia_km, 1) + ' km') : '';
+    var gen = lot.generador_nombre || ('Generador #' + (lot.generador_id || '?'));
+    return (
+        '<div class="lot-popup">' +
+            '<h6>' + escHtml(lot.producto || ('Lote #' + lot.id)) + '</h6>' +
+            '<div class="lot-popup-meta">' +
+                '<div><strong>Categoría:</strong> ' + escHtml(cat) + '</div>' +
+                '<div><strong>Cantidad:</strong> ' + kg + ' kg</div>' +
+                '<div><strong>Caduca:</strong> ' + escHtml(tr.text || '') + '</div>' +
+                '<div><strong>Generador:</strong> ' + escHtml(gen) + '</div>' +
+            '</div>' +
+            '<div class="lot-popup-footer">' +
+                '<span class="lot-popup-price">' + price + '</span>' +
+                (dist ? '<span class="lot-popup-dist">' + dist + '</span>' : '') +
+                '<button type="button" onclick="openLotDetail(' + lot.id + ')">' +
+                    '<i class="bi bi-hammer"></i> Pujar' +
+                '</button>' +
+            '</div>' +
+        '</div>'
+    );
+}
+
+function drawUserLocation(lat, lon, radiusKm) {
+    if (!_map) return;
+    if (_userMarker) _map.removeLayer(_userMarker);
+    if (_userCircle) _map.removeLayer(_userCircle);
+    var icon = L.divIcon({
+        className: 'pin-marker',
+        html: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">' +
+                '<circle cx="12" cy="12" r="8" fill="#2563eb" stroke="#fff" stroke-width="3"/>' +
+              '</svg>',
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+    });
+    _userMarker = L.marker([lat, lon], { icon: icon, title: 'Tu ubicación' }).addTo(_map);
+    _userCircle = L.circle([lat, lon], {
+        radius: radiusKm * 1000,
+        color: '#2563eb',
+        weight: 1.5,
+        fillColor: '#3b82f6',
+        fillOpacity: 0.06,
+        dashArray: '4,4',
+    }).addTo(_map);
+}
+
+function useMyLocation() {
+    if (!navigator.geolocation) {
+        showToast('Tu navegador no soporta geolocalización', 'warning');
+        return;
+    }
+    var btn = document.getElementById('btnGeoLocate');
+    if (btn) btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+    navigator.geolocation.getCurrentPosition(function(pos) {
+        document.getElementById('mapLat').value = pos.coords.latitude.toFixed(4);
+        document.getElementById('mapLon').value = pos.coords.longitude.toFixed(4);
+        if (btn) btn.innerHTML = '<i class="bi bi-crosshair"></i>';
+        loadNearbyLots();
+    }, function(err) {
+        if (btn) btn.innerHTML = '<i class="bi bi-crosshair"></i>';
+        showToast('No se pudo obtener tu ubicación: ' + (err.message || 'permiso denegado'), 'warning');
+    }, { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 });
+}
+window.useMyLocation = useMyLocation;
+
+async function loadNearbyLots() {
+    initMapOnce();
+    var lat = parseFloat(document.getElementById('mapLat').value);
+    var lon = parseFloat(document.getElementById('mapLon').value);
+    var radius = parseFloat(document.getElementById('mapRadius').value) || 50;
+    var wRaw = parseInt(document.getElementById('mapMaxWeight').value, 10);
+    var category = document.getElementById('filterCat').value;
+    if (isNaN(lat) || isNaN(lon)) {
+        showToast('Introduce una latitud y longitud válidas', 'warning');
+        return;
+    }
+    var params = new URLSearchParams();
+    params.set('lat', lat);
+    params.set('lon', lon);
+    params.set('radius_km', radius);
+    if (wRaw && wRaw > 0) params.set('max_weight_kg', wRaw);
+    if (category) params.set('category', category);
+    params.set('limit', '300');
+
+    var statusEl = document.getElementById('mapStatus');
+    statusEl.textContent = 'Buscando...';
+    if (_nearbyAbort) _nearbyAbort.abort();
+    _nearbyAbort = (typeof AbortController === 'function') ? new AbortController() : null;
+
+    try {
+        var res = await fetch(API_BASE + '/lots/nearby?' + params.toString(), {
+            signal: _nearbyAbort ? _nearbyAbort.signal : undefined,
+            headers: authToken ? { Authorization: 'Bearer ' + authToken } : {}
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        var data = await res.json();
+        var appliedRadius = (data.query && data.query.radius_km) || radius;
+        if (appliedRadius !== radius) {
+            statusEl.textContent = data.count + ' lotes · radio ajustado a ' + appliedRadius + ' km por logística';
+        } else {
+            statusEl.textContent = data.count + ' lotes en ' + appliedRadius + ' km';
+        }
+        renderMapLots(data.lots || [], lat, lon, appliedRadius);
+    } catch (e) {
+        if (e.name === 'AbortError') return;
+        statusEl.textContent = 'Error cargando mapa';
+        showToast('No se pudieron cargar lotes cercanos: ' + (e.message || e), 'danger');
+    }
+}
+window.loadNearbyLots = loadNearbyLots;
+
+function renderMapLots(lots, userLat, userLon, radiusKm) {
+    if (!_map || !_mapCluster) return;
+    _mapCluster.clearLayers();
+    var bounds = [];
+    lots.forEach(function(lot) {
+        if (lot.ubicacion_lat == null || lot.ubicacion_lon == null) return;
+        if (lot.ubicacion_lat === 0 && lot.ubicacion_lon === 0) return;
+        var m = L.marker([lot.ubicacion_lat, lot.ubicacion_lon], {
+            icon: pinIconForCategory(lot.categoria),
+            title: lot.producto + ' — ' + (lot.cantidad_kg || 0) + ' kg',
+            keyboard: true,
+            alt: 'Lote ' + (lot.producto || lot.id)
+        });
+        m.bindPopup(lotPopupHtml(lot), { maxWidth: 280 });
+        _mapCluster.addLayer(m);
+        bounds.push([lot.ubicacion_lat, lot.ubicacion_lon]);
+    });
+    drawUserLocation(userLat, userLon, radiusKm);
+    bounds.push([userLat, userLon]);
+    if (bounds.length > 1) {
+        try { _map.fitBounds(bounds, { padding: [30, 30], maxZoom: 13 }); }
+        catch (_) { _map.setView([userLat, userLon], 8); }
+    } else {
+        _map.setView([userLat, userLon], 10);
+    }
 }
 
 // ===================== INIT =====================
 document.addEventListener('DOMContentLoaded', function() {
     updateAuthUI();
-    setupNavTracking();
-    loadStats();
-    loadDashboard();
+    setupNavScroll();
+    setupScrollAnimations();
+    loadHeroStats();
     loadLots();
+    onMapControlChange();  // sync slider labels on first paint
+
+    // Auto-refresh stats every 60 seconds
+    statsRefreshInterval = setInterval(function() {
+        loadHeroStats();
+    }, 60000);
 });
 
 })();
