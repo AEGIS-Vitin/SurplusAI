@@ -1132,6 +1132,46 @@ def close_transaction(
         transaccion.uso_final.value
     )
 
+    # ---- SurplusAI revenue split (P0.2) ----
+    # Gemini, in VERDICT_BUSINESS_MODEL.md: "Logística sin mínimo de recogida =
+    # suicidio margen. Minimum pickup fee obligatorio." We enforce €25 as the
+    # floor regardless of what the client passes. The food price
+    # (precio_final) remains whatever the generator set; SurplusAI invoices
+    # on top of that.
+    #
+    # If the client didn't pass a logistics_fee, compute it from distance_km.
+    # If neither is available, fall back to the minimum (€25) — we'd rather
+    # overcharge than miss a fee.
+    explicit_logistics_fee = transaccion.logistics_fee_eur
+    if explicit_logistics_fee is None:
+        explicit_logistics_fee = calculate_logistics_fee(transaccion.distance_km)
+    # Enforce minimum €25 *always*, even if the caller tried to undercut it.
+    logistics_fee = max(float(explicit_logistics_fee), LOGISTICS_MIN_FEE_EUR)
+
+    service_fee = (
+        transaccion.service_fee_eur
+        if transaccion.service_fee_eur is not None
+        else calculate_service_fee(transaccion.cantidad_kg)
+    )
+
+    # Derive outcome from receptor tipo + lot category when the caller
+    # didn't specify one explicitly. This is what the dashboard reads.
+    outcome_val = transaccion.outcome.value if transaccion.outcome else None
+    if not outcome_val:
+        receptor_tipo = puja.receptor.tipo.value if puja.receptor and hasattr(puja.receptor.tipo, "value") else None
+        if not receptor_tipo:
+            rec_row = db.query(database.ReceptorDB).filter(
+                database.ReceptorDB.id == puja.receptor_id
+            ).first()
+            receptor_tipo = rec_row.tipo.value if rec_row and hasattr(rec_row.tipo, "value") else str(rec_row.tipo) if rec_row else "biogas"
+        outcome_val = auto_matching.TIPO_TO_OUTCOME.get(receptor_tipo, "biomass_biogas")
+
+    biomass_revenue = (
+        transaccion.biomass_revenue_eur
+        if transaccion.biomass_revenue_eur is not None
+        else calculate_biomass_revenue(outcome_val, transaccion.cantidad_kg)
+    )
+
     # Create transaction
     db_transaccion = database.TransaccionDB(
         lote_id=transaccion.lote_id,
@@ -1142,7 +1182,11 @@ def close_transaction(
         cantidad_kg=transaccion.cantidad_kg,
         uso_final=transaccion.uso_final,
         co2_evitado_kg=co2_evitado,
-        estado=models.EstadoTransaccion.completada
+        estado=models.EstadoTransaccion.completada,
+        service_fee_eur=service_fee,
+        logistics_fee_eur=logistics_fee,
+        biomass_revenue_eur=biomass_revenue,
+        outcome=outcome_val,
     )
 
     # Mark lot as adjudicated
