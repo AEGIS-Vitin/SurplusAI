@@ -11,8 +11,10 @@ RUN apt-get update && apt-get install -y \
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy app code
+# Copy app code. The frontend is placed at /frontend so main.py can mount
+# it at /app via StaticFiles (path resolved as <backend>/../frontend).
 COPY backend/ /app/
+COPY frontend/ /frontend/
 
 ENV PYTHONUNBUFFERED=1
 
