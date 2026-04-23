@@ -1174,23 +1174,54 @@
     <div class="container py-3">
         <div class="text-center mb-5 fade-in-up">
             <h2 class="section-title">Dashboard de impacto</h2>
-            <p class="section-subtitle mx-auto">Datos en tiempo real del marketplace de excedentes</p>
+            <p class="section-subtitle mx-auto">Datos reales del marketplace SurplusAI</p>
             <div class="section-divider mx-auto"></div>
         </div>
 
+        <!-- P0.4 — BIG NUMBERS UP TOP: operational impact, not vanity metrics -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-6 fade-in-up">
+                <div class="stat-card" style="background:linear-gradient(135deg,#dcfce7,#bbf7d0);border-color:#86efac">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <div class="label text-muted small">Toneladas gestionadas</div>
+                            <div class="value" id="statTonnes" style="font-size:2.4rem;color:#14532d">--</div>
+                            <div class="small text-muted">Suma total de kg movidos en el marketplace</div>
+                        </div>
+                        <i class="bi bi-box-seam-fill" style="font-size:3rem;color:#166534;opacity:.25"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 fade-in-up">
+                <div class="stat-card" style="background:linear-gradient(135deg,#dbeafe,#bfdbfe);border-color:#93c5fd">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <div class="label text-muted small">CO₂ evitado</div>
+                            <div class="value" id="statCO2Big" style="font-size:2.4rem;color:#1e3a8a">--</div>
+                            <div class="small text-muted">Kg CO₂-eq evitados al desviar de vertedero</div>
+                        </div>
+                        <i class="bi bi-wind" style="font-size:3rem;color:#1e40af;opacity:.25"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Secondary KPIs: SurplusAI GMV vs food value, actors, fallback count -->
         <div class="row g-3 mb-4" id="dashStats">
             <div class="col-6 col-md-4 col-xl-2 fade-in-up">
                 <div class="stat-card">
-                    <div class="stat-icon mb-2" style="background:#dcfce7;color:#166534"><i class="bi bi-box-seam-fill"></i></div>
-                    <div class="value" id="statLotes">--</div>
-                    <div class="label">Lotes totales</div>
+                    <div class="stat-icon mb-2" style="background:#f3e8ff;color:#6b21a8"><i class="bi bi-currency-euro"></i></div>
+                    <div class="value" id="statGmvSurplusai">--</div>
+                    <div class="label">GMV SurplusAI</div>
+                    <div class="small text-muted">Lo que facturamos (service + logística + biomasa)</div>
                 </div>
             </div>
             <div class="col-6 col-md-4 col-xl-2 fade-in-up">
                 <div class="stat-card">
-                    <div class="stat-icon mb-2" style="background:#dbeafe;color:#1e40af"><i class="bi bi-wind"></i></div>
-                    <div class="value" id="statCO2">--</div>
-                    <div class="label">Kg CO2 evitados</div>
+                    <div class="stat-icon mb-2" style="background:#fef3c7;color:#92400e"><i class="bi bi-tag-fill"></i></div>
+                    <div class="value" id="statFoodValue">--</div>
+                    <div class="label">Valor comida rescatada</div>
+                    <div class="small text-muted">Donaciones + simbólico + recuperación</div>
                 </div>
             </div>
             <div class="col-6 col-md-4 col-xl-2 fade-in-up">
@@ -1198,13 +1229,6 @@
                     <div class="stat-icon mb-2" style="background:#fef3c7;color:#92400e"><i class="bi bi-arrow-left-right"></i></div>
                     <div class="value" id="statTx">--</div>
                     <div class="label">Transacciones</div>
-                </div>
-            </div>
-            <div class="col-6 col-md-4 col-xl-2 fade-in-up">
-                <div class="stat-card">
-                    <div class="stat-icon mb-2" style="background:#f3e8ff;color:#6b21a8"><i class="bi bi-currency-euro"></i></div>
-                    <div class="value" id="statMoney">--</div>
-                    <div class="label">Volumen EUR</div>
                 </div>
             </div>
             <div class="col-6 col-md-4 col-xl-2 fade-in-up">
@@ -1221,17 +1245,39 @@
                     <div class="label">Receptores</div>
                 </div>
             </div>
+            <div class="col-6 col-md-4 col-xl-2 fade-in-up">
+                <div class="stat-card">
+                    <div class="stat-icon mb-2" style="background:#fef3c7;color:#b45309"><i class="bi bi-recycle"></i></div>
+                    <div class="value" id="statFallback">--</div>
+                    <div class="label">Fallback biomasa</div>
+                    <div class="small text-muted">Disposal guarantee activada</div>
+                </div>
+            </div>
         </div>
 
+        <!-- Charts row 1: category (left) + outcomes (right, the NEW P0.4 donut) -->
         <div class="row g-4">
-            <div class="col-lg-5 fade-in-up">
+            <div class="col-lg-6 fade-in-up">
                 <div class="chart-card">
-                    <h6 class="fw-bold mb-3"><i class="bi bi-pie-chart-fill me-2" style="color:var(--primary)"></i>Lotes por categoria</h6>
-                    <div style="position:relative;height:280px">
+                    <h6 class="fw-bold mb-3"><i class="bi bi-pie-chart-fill me-2" style="color:var(--primary)"></i>Lotes por categoría</h6>
+                    <div style="position:relative;height:300px">
                         <canvas id="chartCat"></canvas>
                     </div>
                 </div>
             </div>
+            <div class="col-lg-6 fade-in-up">
+                <div class="chart-card">
+                    <h6 class="fw-bold mb-3"><i class="bi bi-diagram-3 me-2" style="color:var(--primary)"></i>Destino del excedente</h6>
+                    <p class="small text-muted mb-2">Donde terminan los kilos: ONG / banco alimentos / pienso / biomasa / compost. El disposal guarantee cubre el último eslabón.</p>
+                    <div style="position:relative;height:260px">
+                        <canvas id="chartOutcomes"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts row 2: activity time-series + top generators -->
+        <div class="row g-4 mt-1">
             <div class="col-lg-7 fade-in-up">
                 <div class="chart-card">
                     <h6 class="fw-bold mb-3"><i class="bi bi-graph-up me-2" style="color:var(--primary)"></i>Actividad del marketplace</h6>
@@ -1240,12 +1286,10 @@
                     </div>
                 </div>
             </div>
-        </div>
-        <div class="row g-4 mt-1">
-            <div class="col-12 fade-in-up">
+            <div class="col-lg-5 fade-in-up">
                 <div class="chart-card">
-                    <h6 class="fw-bold mb-3"><i class="bi bi-trophy-fill me-2" style="color:var(--secondary)"></i>Top generadores por volumen</h6>
-                    <div style="position:relative;height:250px">
+                    <h6 class="fw-bold mb-3"><i class="bi bi-trophy-fill me-2" style="color:var(--secondary)"></i>Top generadores</h6>
+                    <div style="position:relative;height:280px">
                         <canvas id="chartGenerators"></canvas>
                     </div>
                 </div>
@@ -1778,6 +1822,7 @@ var lotsData = [];
 var chartTx = null;
 var chartCat = null;
 var chartGen = null;
+var chartOutcomes = null;  // P0.4 — destino del excedente donut
 var statsRefreshInterval = null;
 
 // ===================== API HELPER =====================
@@ -2088,13 +2133,93 @@ async function loadHeroStats() {
         if (s) {
             if (s.num_generadores) document.getElementById('heroGeneradores').textContent = fmtNum(s.num_generadores);
             if (s.num_receptores) document.getElementById('heroReceptores').textContent = fmtNum(s.num_receptores);
-            if (s.total_kg_saved) document.getElementById('statCO2').textContent = fmtNum(Math.round(s.total_kg_saved * 2.5));
             if (s.co2_avoided_kg) {
                 document.getElementById('heroCO2').textContent = fmtNum(s.co2_avoided_kg);
-                document.getElementById('statCO2').textContent = fmtNum(s.co2_avoided_kg);
             }
         }
     } catch (e) { /* stats endpoint may not exist */ }
+
+    // P0.4 — /dashboard gives us the SurplusAI-vs-food split + outcomes donut
+    try {
+        var d = await apiFetch('/dashboard');
+        if (d && d.summary) {
+            var sm = d.summary;
+            // Big numbers
+            var tonnes = (sm.total_kg_saved || 0) / 1000;
+            var tEl = document.getElementById('statTonnes');
+            if (tEl) tEl.textContent = fmtNum(tonnes, tonnes < 10 ? 2 : 1) + ' t';
+            var co2El = document.getElementById('statCO2Big');
+            if (co2El) co2El.textContent = fmtNum(Math.round(sm.co2_avoided_kg || 0)) + ' kg';
+
+            // Secondary KPIs
+            var gmvEl = document.getElementById('statGmvSurplusai');
+            if (gmvEl) gmvEl.textContent = fmtEur(sm.gmv_surplusai_eur || 0);
+            var fvEl = document.getElementById('statFoodValue');
+            if (fvEl) fvEl.textContent = fmtEur(sm.food_value_eur || 0);
+            var txEl = document.getElementById('statTx');
+            if (txEl) txEl.textContent = fmtNum(sm.total_transactions || 0);
+            var fbEl = document.getElementById('statFallback');
+            if (fbEl) fbEl.textContent = fmtNum(sm.fallback_tx_count || 0);
+            var gEl = document.getElementById('statGen');
+            if (gEl) gEl.textContent = fmtNum(sm.num_generadores || 0);
+            var rEl = document.getElementById('statRec');
+            if (rEl) rEl.textContent = fmtNum(sm.num_receptores || 0);
+        }
+        // Outcomes donut
+        if (d && d.outcomes) buildOutcomesDonut(d.outcomes);
+    } catch (e) { /* dashboard endpoint may be older; non-fatal */ }
+}
+
+// P0.4 — donut showing where the surplus actually ends up
+var OUTCOME_LABELS = {
+    donated_ong: 'Donación ONG',
+    food_bank: 'Banco de alimentos',
+    cattle_feed: 'Pienso animal',
+    biomass_biogas: 'Biomasa / biogás',
+    energy_biogas: 'Energía biogás',
+    compost: 'Compostaje',
+    unknown: 'Sin clasificar'
+};
+var OUTCOME_COLORS = {
+    donated_ong: '#16a34a',
+    food_bank: '#22c55e',
+    cattle_feed: '#ca8a04',
+    biomass_biogas: '#0ea5e9',
+    energy_biogas: '#0284c7',
+    compost: '#a16207',
+    unknown: '#94a3b8'
+};
+
+function buildOutcomesDonut(outcomes) {
+    var entries = Object.entries(outcomes || {});
+    if (!entries.length) return;
+    var labels = entries.map(function(e) { return OUTCOME_LABELS[e[0]] || e[0]; });
+    var values = entries.map(function(e) { return (e[1] && e[1].kg) || 0; });
+    var colors = entries.map(function(e) { return OUTCOME_COLORS[e[0]] || '#64748b'; });
+    if (chartOutcomes) chartOutcomes.destroy();
+    var ctx = document.getElementById('chartOutcomes');
+    if (!ctx) return;
+    chartOutcomes = new Chart(ctx, {
+        type: 'doughnut',
+        data: { labels: labels, datasets: [{ data: values, backgroundColor: colors, borderWidth: 0, hoverOffset: 8 }] },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { padding: 14, usePointStyle: true, pointStyleWidth: 10, font: { size: 12 } } },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            var total = values.reduce(function(a,b) { return a+b; }, 0) || 1;
+                            var pct = (ctx.parsed / total * 100).toFixed(1);
+                            return ctx.label + ': ' + fmtNum(ctx.parsed, 0) + ' kg (' + pct + '%)';
+                        }
+                    }
+                }
+            },
+            cutout: '62%'
+        }
+    });
 }
 
 // ===================== CHARTS =====================

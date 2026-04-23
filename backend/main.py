@@ -1460,12 +1460,56 @@ def get_dashboard_metrics(db: Session = Depends(get_db)):
         reverse=True
     )[:5]
 
+    # ---- P0.4 — Separate SurplusAI GMV from food value ----
+    # "Valor comida rescatada" = sum(precio_final * cantidad_kg) — often low
+    # because most lots are donated or symbolic. This is NOT the business
+    # metric, just a proxy for social impact.
+    # "GMV SurplusAI"          = sum(service_fee + logistics_fee + biomass_revenue).
+    # This is what we invoice. Per VERDICT P0.3 we expect this to be 3-10x
+    # bigger than the food value on realistic data.
+    food_value = sum(
+        (t.precio_final or 0.0) * (t.cantidad_kg or 0.0) for t in transacciones
+    )
+    gmv_service = sum((t.service_fee_eur or 0.0) for t in transacciones)
+    gmv_logistics = sum((t.logistics_fee_eur or 0.0) for t in transacciones)
+    gmv_biomass = sum((t.biomass_revenue_eur or 0.0) for t in transacciones)
+    gmv_surplusai = gmv_service + gmv_logistics + gmv_biomass
+
+    # Outcome breakdown for the donut chart
+    outcome_breakdown: dict = {}
+    for t in transacciones:
+        key = t.outcome or "unknown"
+        entry = outcome_breakdown.setdefault(
+            key, {"transactions": 0, "kg": 0.0, "gmv_surplusai": 0.0}
+        )
+        entry["transactions"] += 1
+        entry["kg"] += t.cantidad_kg or 0.0
+        entry["gmv_surplusai"] += (
+            (t.service_fee_eur or 0.0)
+            + (t.logistics_fee_eur or 0.0)
+            + (t.biomass_revenue_eur or 0.0)
+        )
+
+    # Fallback / disposal-guarantee KPI: how many transactions ended in a
+    # non-human destination (biogas/compost/cattle_feed). Tracks how often
+    # our disposal guarantee actually had to kick in.
+    fallback_outcomes = {"biomass_biogas", "energy_biogas", "compost", "cattle_feed"}
+    fallback_tx_count = sum(1 for t in transacciones if t.outcome in fallback_outcomes)
+
     return {
         "summary": {
             "total_kg_saved": round(total_kg, 1),
             "total_transactions": len(transacciones),
             "co2_avoided_kg": round(total_co2, 2),
-            "money_transacted": round(total_value, 2),
+            # Back-compat: `money_transacted` kept for old clients but now
+            # mirrors the clearer `food_value_eur`.
+            "money_transacted": round(food_value, 2),
+            "food_value_eur": round(food_value, 2),
+            "gmv_surplusai_eur": round(gmv_surplusai, 2),
+            "gmv_service_fee_eur": round(gmv_service, 2),
+            "gmv_logistics_fee_eur": round(gmv_logistics, 2),
+            "gmv_biomass_revenue_eur": round(gmv_biomass, 2),
+            "fallback_tx_count": fallback_tx_count,
             "num_generadores": db.query(database.GeneradorDB).count(),
             "num_receptores": db.query(database.ReceptorDB).count()
         },
@@ -1473,6 +1517,7 @@ def get_dashboard_metrics(db: Session = Depends(get_db)):
             "transactions_per_day": trans_by_day
         },
         "categories": category_stats,
+        "outcomes": outcome_breakdown,
         "top_generators": top_generators,
         "top_receptors": top_receptors,
         "compliance_stats": {
