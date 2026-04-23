@@ -1533,6 +1533,40 @@ def get_carbon_footprints():
     return carbon.get_sector_footprints()
 
 
+# ==================== SUBSCRIPTION PLANS (P0.5) ====================
+
+@app.get("/subscriptions/plans", response_model=List[models.SubscriptionPlan], tags=["Pricing"])
+def list_subscription_plans(db: Session = Depends(get_db)):
+    """List the 3 canonical SurplusAI pricing tiers.
+
+    Seeded (idempotently) on startup from VERDICT_BUSINESS_MODEL.md:
+      * Starter     €0/mes     · hasta 5 lotes/mes
+      * Pro         €199/mes   · hasta 20 lotes/mes, API read-only, dashboard
+      * Enterprise  €4.999/mes · unlimited, API write, gestor cuenta, SLA 99.9%
+
+    Lot fee per unit: €25 base + €0.25/km (min €25) — enforced in
+    POST /transactions (see P0.2).
+    """
+    # Make sure the seed ran at least once — cheap to call.
+    try:
+        database.seed_subscription_plans()
+    except Exception:
+        pass
+    plans = db.query(database.SubscriptionPlanDB).order_by(
+        database.SubscriptionPlanDB.price_monthly_eur.asc()
+    ).all()
+    return [
+        models.SubscriptionPlan(
+            id=p.id,
+            name=p.name,
+            price_monthly_eur=p.price_monthly_eur,
+            max_lots_month=p.max_lots_month,
+            includes=p.includes or {},
+        )
+        for p in plans
+    ]
+
+
 @app.get("/price-suggestion", tags=["Pricing"])
 def suggest_price(
     categoria: models.Categoria,

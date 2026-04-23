@@ -1298,82 +1298,96 @@
     </div>
 </section>
 
-<!-- ==================== PRICING ==================== -->
+<!-- ==================== PRICING (P0.5 — VERDICT_BUSINESS_MODEL.md) ==================== -->
 <section id="precios" class="py-5">
     <div class="container py-3">
         <div class="text-center mb-5 fade-in-up">
             <h2 class="section-title">Planes y precios</h2>
-            <p class="section-subtitle mx-auto">Elige el plan que mejor se adapte a tu volumen de operaciones</p>
+            <p class="section-subtitle mx-auto">Suscripción mensual + tarifa por recogida. Sin porcentajes sobre tus ventas.</p>
             <div class="section-divider mx-auto"></div>
         </div>
-        <div class="row g-4 justify-content-center">
+        <div class="row g-4 justify-content-center" id="pricingPlans">
             <div class="col-md-6 col-lg-4 fade-in-up">
-                <div class="pricing-card">
+                <div class="pricing-card" data-plan="Starter">
                     <div class="text-center mb-4">
                         <div class="d-inline-flex align-items-center justify-content-center rounded-circle mb-3" style="width:56px;height:56px;background:var(--primary-50)">
                             <i class="bi bi-box-seam" style="font-size:1.4rem;color:var(--primary)"></i>
                         </div>
-                        <h5 class="fw-bold mb-1">Basico</h5>
-                        <p class="small text-muted mb-3">Para pequenos generadores</p>
-                        <div class="price">299<small> EUR/mes</small></div>
+                        <h5 class="fw-bold mb-1">Starter</h5>
+                        <p class="small text-muted mb-3">Para autónomos, HORECA pequeña, piloto Ley 1/2025</p>
+                        <div class="price">0<small> EUR/mes</small></div>
                     </div>
                     <ul class="feature-list">
-                        <li><i class="bi bi-check-circle-fill"></i> Hasta 50 lotes/mes</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Panel de control basico</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Cumplimiento Ley 1/2025</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Soporte por email</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Trazabilidad documental</li>
-                        <li class="disabled"><i class="bi bi-x-circle-fill"></i> Matching con IA avanzado</li>
-                        <li class="disabled"><i class="bi bi-x-circle-fill"></i> API de integracion</li>
-                        <li class="disabled"><i class="bi bi-x-circle-fill"></i> Account manager dedicado</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Hasta <strong>5 lotes</strong>/mes</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Matching automático receptores</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Documentación Ley 1/2025</li>
+                        <li class="disabled"><i class="bi bi-x-circle-fill"></i> Dashboard avanzado</li>
+                        <li class="disabled"><i class="bi bi-x-circle-fill"></i> API</li>
+                        <li class="disabled"><i class="bi bi-x-circle-fill"></i> Gestor de cuenta</li>
                     </ul>
-                    <button class="btn btn-outline-custom w-100 py-2" onclick="showAuthModal('register')">Empezar gratis 14 dias</button>
+                    <button class="btn btn-outline-custom w-100 py-2" onclick="showAuthModal('register')">Empezar gratis</button>
                 </div>
             </div>
             <div class="col-md-6 col-lg-4 fade-in-up">
-                <div class="pricing-card featured">
+                <div class="pricing-card featured" data-plan="Pro">
                     <div class="text-center mb-4">
                         <div class="d-inline-flex align-items-center justify-content-center rounded-circle mb-3" style="width:56px;height:56px;background:var(--primary-100)">
                             <i class="bi bi-star-fill" style="font-size:1.4rem;color:var(--primary)"></i>
                         </div>
-                        <h5 class="fw-bold mb-1">Profesional</h5>
-                        <p class="small text-muted mb-3">Para cadenas y distribuidores</p>
-                        <div class="price">599<small> EUR/mes</small></div>
+                        <h5 class="fw-bold mb-1">Pro</h5>
+                        <p class="small text-muted mb-3">Restaurantes de grupo, industrias regionales, cadenas locales</p>
+                        <div class="price">199<small> EUR/mes</small></div>
                     </div>
                     <ul class="feature-list">
-                        <li><i class="bi bi-check-circle-fill"></i> Lotes ilimitados</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Dashboard avanzado con analytics</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Cumplimiento Ley 1/2025</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Soporte prioritario 24/7</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Trazabilidad completa</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Matching con IA avanzado</li>
-                        <li><i class="bi bi-check-circle-fill"></i> API de integracion (REST)</li>
-                        <li class="disabled"><i class="bi bi-x-circle-fill"></i> Account manager dedicado</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Hasta <strong>20 lotes</strong>/mes</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Matching automático + fallback biomasa</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Documentación Ley 1/2025 + compliance docs</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Dashboard completo</li>
+                        <li><i class="bi bi-check-circle-fill"></i> API read-only (REST)</li>
+                        <li><i class="bi bi-check-circle-fill"></i> SLA 99,5%, soporte 24h</li>
+                        <li class="disabled"><i class="bi bi-x-circle-fill"></i> Gestor de cuenta dedicado</li>
                     </ul>
-                    <button class="btn btn-primary-custom w-100 py-2" onclick="showAuthModal('register')">Empezar gratis 14 dias</button>
+                    <button class="btn btn-primary-custom w-100 py-2" onclick="showAuthModal('register')">Empezar 14 días gratis</button>
                 </div>
             </div>
             <div class="col-md-6 col-lg-4 fade-in-up">
-                <div class="pricing-card">
+                <div class="pricing-card" data-plan="Enterprise">
                     <div class="text-center mb-4">
                         <div class="d-inline-flex align-items-center justify-content-center rounded-circle mb-3" style="width:56px;height:56px;background:#fef3c7">
                             <i class="bi bi-gem" style="font-size:1.4rem;color:var(--secondary-dark)"></i>
                         </div>
                         <h5 class="fw-bold mb-1">Enterprise</h5>
-                        <p class="small text-muted mb-3">Para grandes corporaciones</p>
-                        <div class="price">999<small> EUR/mes</small></div>
+                        <p class="small text-muted mb-3">Mercadona, Carrefour, grupos hospitalarios, catering industrial</p>
+                        <div class="price">4.999<small> EUR/mes base</small></div>
                     </div>
                     <ul class="feature-list">
-                        <li><i class="bi bi-check-circle-fill"></i> Todo del plan Profesional</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Multi-sede y multi-usuario</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Auditoria y compliance avanzado</li>
-                        <li><i class="bi bi-check-circle-fill"></i> SLA garantizado 99.9%</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Integraciones ERP/SAP</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Matching con IA predictivo</li>
-                        <li><i class="bi bi-check-circle-fill"></i> API completa + Webhooks</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Account manager dedicado</li>
+                        <li><i class="bi bi-check-circle-fill"></i> <strong>Lotes ilimitados</strong></li>
+                        <li><i class="bi bi-check-circle-fill"></i> API completa (read + write)</li>
+                        <li><i class="bi bi-check-circle-fill"></i> ESG reporting custom</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Integración ERP/SAP</li>
+                        <li><i class="bi bi-check-circle-fill"></i> SLA 99,9%, respuesta en 4h</li>
+                        <li><i class="bi bi-check-circle-fill"></i> <strong>Gestor de cuenta dedicado</strong></li>
+                        <li><i class="bi bi-info-circle"></i> Surcharges por volumen negociables</li>
                     </ul>
-                    <button class="btn btn-outline-custom w-100 py-2" onclick="showAuthModal('register')">Contactar ventas</button>
+                    <button class="btn btn-outline-custom w-100 py-2" onclick="document.getElementById('contacto').scrollIntoView({behavior:'smooth'})">Contactar ventas</button>
+                </div>
+            </div>
+        </div>
+        <!-- Per-lot fee disclosure — Gemini's minimum pickup fee lives here too -->
+        <div class="row justify-content-center mt-4">
+            <div class="col-lg-10">
+                <div class="rounded-3 p-3" style="background:#fff7ed;border:1px solid #fed7aa">
+                    <div class="d-flex align-items-start gap-3">
+                        <i class="bi bi-truck" style="font-size:1.5rem;color:#9a3412;flex-shrink:0"></i>
+                        <div class="small">
+                            <div class="fw-semibold mb-1" style="color:#9a3412">Tarifa por recogida (además de la suscripción)</div>
+                            <div class="text-muted">
+                                <strong>€25 mínimo</strong> por lote + €0,25/km. Nunca cobramos porcentaje sobre el valor de la comida.
+                                Cuando un lote se marca como biomasa/compostaje o pienso, SurplusAI factura directamente a la planta receptora
+                                (entre €30 y €55 por tonelada) — tú cumples Ley 1/2025 sin más coste.
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
