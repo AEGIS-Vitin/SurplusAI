@@ -81,6 +81,24 @@ cd car_arbitrage
 El script crea venv, instala deps, corre tests, y arranca el backend con
 el frontend servido en el mismo origen (sin CORS) en el puerto 8000.
 
+## Aún más rápido — single-file Python
+
+```bash
+python3 car_arbitrage_solo.py
+# → http://localhost:8000
+```
+
+UN solo archivo (`car_arbitrage_solo.py`) con TODO embebido: motor fiscal,
+FastAPI, frontend, SQLite, Telegram. Auto-instala dependencias.
+
+## Para móvil — artefacto HTML puro (sin servidor)
+
+`car_arbitrage_artifact.html` es un único archivo HTML que abres con
+doble clic o subes a tu móvil. Toda la fiscalidad (IEDMT, IVA REBU,
+aduanas extra-UE, escenarios, ROI, riesgo, Monte Carlo) corre en el
+navegador. Funciona offline. NO incluye scrapers ni Telegram (necesitan
+servidor).
+
 ## Quick start con Docker
 
 ```bash
