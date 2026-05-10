@@ -1636,6 +1636,27 @@ async def waitlist_list(db: Session = Depends(database.get_db), current_user: au
              "created_at": e.created_at.isoformat()} for e in entries]
 
 
+
+
+# ── SEO: sitemap + robots ──────────────────────────────────────────────
+from fastapi.responses import PlainTextResponse
+import datetime as _dt
+
+@app.get("/sitemap.xml", response_class=PlainTextResponse, include_in_schema=False)
+def sitemap():
+    base = "https://surplusai.es"
+    today = _dt.date.today().isoformat()
+    urls = ["/", "/cumplimiento", "/donaciones", "/contacto"]
+    items = "\n".join(
+        f"""  <url>\n    <loc>{base}{u}</loc>\n    <lastmod>{today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>{"1.0" if u == "/" else "0.8"}</priority>\n  </url>"""
+        for u in urls
+    )
+    return f"""<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n{items}\n</urlset>"""
+
+@app.get("/robots.txt", response_class=PlainTextResponse, include_in_schema=False)
+def robots():
+    return "User-agent: *\nAllow: /\nSitemap: https://surplusai.es/sitemap.xml\n"
+
 # ---- Root redirect ----
 # Anyone hitting https://tresaaa-surplus.es/ lands on the SPA at /app/.
 # 302 (not 301) to avoid aggressive browser caching while the app evolves.
