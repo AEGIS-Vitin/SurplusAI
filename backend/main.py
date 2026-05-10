@@ -1,9 +1,10 @@
 """
-AEGIS-FOOD: B2B Food Surplus Marketplace
+TRESAAA Surplus: B2B Food Surplus Marketplace
 Main FastAPI application with JWT authentication and email notifications.
 """
 
 from fastapi import FastAPI, Depends, HTTPException, Query, Header
+from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
@@ -26,7 +27,7 @@ import auth
 import notifications
 
 
-# ---- SurplusAI pricing constants (P0.2 — see VERDICT_BUSINESS_MODEL.md) ----
+# ---- TRESAAA Surplus pricing constants (P0.2 — see VERDICT_BUSINESS_MODEL.md) ----
 # "Logística: €0.25/km + MÍNIMO €25-30 por recogida (insight Gemini crítico —
 #  sin esto te matan las recogidas pequeñas)."
 # We go with €25 as the floor, which is also what the frontend advertises.
@@ -41,7 +42,7 @@ SERVICE_FEE_BY_WEIGHT = [
     (5000, 40.0),
     (float("inf"), 80.0),   # big lots (>5t) go to Enterprise bracket
 ]
-# Biomass / compost / feed revenue per tonne (plant pays SurplusAI for the raw
+# Biomass / compost / feed revenue per tonne (plant pays TRESAAA Surplus for the raw
 # material — we are the contract holder, per Grok/Gemini consensus).
 BIOMASS_REVENUE_EUR_PER_TONNE = {
     "biomass_biogas": 55.0,
@@ -78,7 +79,7 @@ load_dotenv()
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="AEGIS-FOOD API",
+    title="TRESAAA Surplus API",
     description="B2B Food Surplus Marketplace para cumplir Ley 1/2025",
     version="1.0.0",
     docs_url="/docs",
@@ -90,7 +91,7 @@ app = FastAPI(
 # In production we lock to known origins; in dev we allow localhost on any port.
 # Override via CORS_ORIGINS env var (comma-separated) if needed.
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
-_default_origins_prod = ["https://surplusai.es", "https://www.surplusai.es"]
+_default_origins_prod = ["https://tresaaa-surplus.es", "https://www.tresaaa-surplus.es"]
 _default_origin_regex = r"^http://localhost(:\d+)?$"
 
 _cors_override = os.getenv("CORS_ORIGINS")
@@ -573,7 +574,7 @@ def create_lot(
     # ---- Dutch auction KILLED (P0.1) ----
     # The original model recomputed precio_actual as a descending-price
     # auction. VERDICT_BUSINESS_MODEL.md (Gemini leg, endorsed by Victor)
-    # flagged this as a strategic error: SurplusAI charges logistics +
+    # flagged this as a strategic error: TRESAAA Surplus charges logistics +
     # service fee + biomass revenue, NOT a cut of an auction. The price of
     # the *food* is whatever the generator sets (often 0€ or symbolic) and
     # it STAYS THERE. Dynamic pricing pressure creates perverse incentives
@@ -1042,7 +1043,7 @@ def create_bid(
         # precio_actual used to be recomputed via pricing.calculate_dynamic_price
         # whenever a new bid arrived. It no longer is — the food price is
         # whatever the generator set and stays there. The only thing that
-        # varies between transactions is the service/logistics fee SurplusAI
+        # varies between transactions is the service/logistics fee TRESAAA Surplus
         # charges, which lives on the Transaccion row, not here.
         db.refresh(db_puja)
 
@@ -1132,11 +1133,11 @@ def close_transaction(
         transaccion.uso_final.value
     )
 
-    # ---- SurplusAI revenue split (P0.2) ----
+    # ---- TRESAAA Surplus revenue split (P0.2) ----
     # Gemini, in VERDICT_BUSINESS_MODEL.md: "Logística sin mínimo de recogida =
     # suicidio margen. Minimum pickup fee obligatorio." We enforce €25 as the
     # floor regardless of what the client passes. The food price
-    # (precio_final) remains whatever the generator set; SurplusAI invoices
+    # (precio_final) remains whatever the generator set; TRESAAA Surplus invoices
     # on top of that.
     #
     # If the client didn't pass a logistics_fee, compute it from distance_km.
@@ -1460,11 +1461,11 @@ def get_dashboard_metrics(db: Session = Depends(get_db)):
         reverse=True
     )[:5]
 
-    # ---- P0.4 — Separate SurplusAI GMV from food value ----
+    # ---- P0.4 — Separate TRESAAA Surplus GMV from food value ----
     # "Valor comida rescatada" = sum(precio_final * cantidad_kg) — often low
     # because most lots are donated or symbolic. This is NOT the business
     # metric, just a proxy for social impact.
-    # "GMV SurplusAI"          = sum(service_fee + logistics_fee + biomass_revenue).
+    # "GMV TRESAAA Surplus"          = sum(service_fee + logistics_fee + biomass_revenue).
     # This is what we invoice. Per VERDICT P0.3 we expect this to be 3-10x
     # bigger than the food value on realistic data.
     food_value = sum(
@@ -1473,18 +1474,18 @@ def get_dashboard_metrics(db: Session = Depends(get_db)):
     gmv_service = sum((t.service_fee_eur or 0.0) for t in transacciones)
     gmv_logistics = sum((t.logistics_fee_eur or 0.0) for t in transacciones)
     gmv_biomass = sum((t.biomass_revenue_eur or 0.0) for t in transacciones)
-    gmv_surplusai = gmv_service + gmv_logistics + gmv_biomass
+    gmv_tresaaa_surplus = gmv_service + gmv_logistics + gmv_biomass
 
     # Outcome breakdown for the donut chart
     outcome_breakdown: dict = {}
     for t in transacciones:
         key = t.outcome or "unknown"
         entry = outcome_breakdown.setdefault(
-            key, {"transactions": 0, "kg": 0.0, "gmv_surplusai": 0.0}
+            key, {"transactions": 0, "kg": 0.0, "gmv_tresaaa-surplus": 0.0}
         )
         entry["transactions"] += 1
         entry["kg"] += t.cantidad_kg or 0.0
-        entry["gmv_surplusai"] += (
+        entry["gmv_tresaaa-surplus"] += (
             (t.service_fee_eur or 0.0)
             + (t.logistics_fee_eur or 0.0)
             + (t.biomass_revenue_eur or 0.0)
@@ -1505,7 +1506,7 @@ def get_dashboard_metrics(db: Session = Depends(get_db)):
             # mirrors the clearer `food_value_eur`.
             "money_transacted": round(food_value, 2),
             "food_value_eur": round(food_value, 2),
-            "gmv_surplusai_eur": round(gmv_surplusai, 2),
+            "gmv_tresaaa-surplus_eur": round(gmv_tresaaa-surplus, 2),
             "gmv_service_fee_eur": round(gmv_service, 2),
             "gmv_logistics_fee_eur": round(gmv_logistics, 2),
             "gmv_biomass_revenue_eur": round(gmv_biomass, 2),
@@ -1537,7 +1538,7 @@ def get_carbon_footprints():
 
 @app.get("/subscriptions/plans", response_model=List[models.SubscriptionPlan], tags=["Pricing"])
 def list_subscription_plans(db: Session = Depends(get_db)):
-    """List the 3 canonical SurplusAI pricing tiers.
+    """List the 3 canonical TRESAAA Surplus pricing tiers.
 
     Seeded (idempotently) on startup from VERDICT_BUSINESS_MODEL.md:
       * Starter     €0/mes     · hasta 5 lotes/mes
@@ -1592,8 +1593,51 @@ def suggest_price(
     }
 
 
+# ---- Waitlist ----
+
+class WaitlistEntry(BaseModel):
+    nombre: str
+    empresa: str
+    email: str
+    telefono: str = ""
+    sector: str = ""
+
+class WaitlistEntryResponse(BaseModel):
+    status: str
+    message: str = ""
+
+@app.post("/waitlist/", response_model=WaitlistEntryResponse, tags=["Waitlist"], status_code=201)
+async def join_waitlist(entry: WaitlistEntry, db: Session = Depends(database.get_db)):
+    existing = db.query(database.WaitlistEntryDB).filter_by(email=entry.email).first()
+    if existing:
+        return {"status": "already_registered", "message": "Email ya registrado"}
+    db.add(database.WaitlistEntryDB(
+        nombre=entry.nombre,
+        empresa=entry.empresa,
+        email=entry.email,
+        telefono=entry.telefono,
+        sector=entry.sector,
+    ))
+    db.commit()
+    return {"status": "ok", "message": "Te avisamos antes del lanzamiento"}
+
+@app.get("/waitlist/count", tags=["Waitlist"])
+async def waitlist_count(db: Session = Depends(database.get_db)):
+    count = db.query(database.WaitlistEntryDB).count()
+    return {"count": count}
+
+@app.get("/waitlist/admin", tags=["Waitlist"])
+async def waitlist_list(db: Session = Depends(database.get_db), current_user: auth.UserDB = Depends(auth.get_current_user)):
+    if current_user.rol != "admin":
+        raise HTTPException(403, "Solo admins")
+    entries = db.query(database.WaitlistEntryDB).order_by(database.WaitlistEntryDB.created_at.desc()).all()
+    return [{"id": e.id, "nombre": e.nombre, "empresa": e.empresa, "email": e.email,
+             "telefono": e.telefono, "sector": e.sector, "contacted": e.contacted,
+             "created_at": e.created_at.isoformat()} for e in entries]
+
+
 # ---- Root redirect ----
-# Anyone hitting https://surplusai.es/ lands on the SPA at /app/.
+# Anyone hitting https://tresaaa-surplus.es/ lands on the SPA at /app/.
 # 302 (not 301) to avoid aggressive browser caching while the app evolves.
 @app.get("/", include_in_schema=False)
 async def root_redirect():

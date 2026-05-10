@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TRESAAA Surplus · Lista de espera acceso anticipado</title>
+<style>
+  body{font-family:system-ui,sans-serif;max-width:560px;margin:60px auto;padding:0 20px;color:#1a1a1a}
+  h1{font-size:1.8rem;line-height:1.2}
+  .badge{background:#d4edda;color:#155724;padding:4px 10px;border-radius:4px;font-size:.8rem;font-weight:700}
+  input,select{width:100%;padding:10px;margin:6px 0 12px;border:1px solid #ccc;border-radius:6px;font-size:1rem;box-sizing:border-box}
+  button{background:#1a6b3a;color:#fff;border:none;padding:14px 28px;border-radius:6px;font-size:1rem;cursor:pointer;width:100%}
+  button:hover{background:#145530}
+  .legal{font-size:.75rem;color:#888;margin-top:8px}
+  #msg{display:none;background:#d4edda;color:#155724;padding:12px;border-radius:6px;margin-top:12px}
+  #counter{font-size:.9rem;color:#555;margin-bottom:16px}
+</style>
+</head>
+<body>
+<span class="badge">⚡ Sanciones activas desde 02/04/2026</span>
+<h1>¿Tu empresa gestiona excedentes alimentarios?<br>La multa es de hasta <strong>€500.000</strong></h1>
+<p>TRESAAA Surplus automatiza el registro, la donación a ONGs y el reporte al Ministerio. Cumple la <strong>Ley 1/2025</strong> sin burocracia.</p>
+<p id="counter">Cargando...</p>
+<form id="wl">
+  <input name="nombre" placeholder="Tu nombre" required>
+  <input name="empresa" placeholder="Nombre de la empresa" required>
+  <input name="email" type="email" placeholder="Email corporativo" required>
+  <input name="telefono" placeholder="Teléfono (opcional)">
+  <select name="sector">
+    <option value="">Sector (opcional)</option>
+    <option>Hostelería / Restauración</option>
+    <option>Distribución / Logística</option>
+    <option>Supermercado / Retail</option>
+    <option>Producción / Industria alimentaria</option>
+    <option>Catering / Colectividades</option>
+  </select>
+  <button type="submit">Quiero cumplir la ley → acceso anticipado</button>
+  <p class="legal">Sin spam. Solo te contactamos cuando esté listo el acceso.</p>
+</form>
+<div id="msg">✅ Registrado. Te avisamos antes del lanzamiento oficial.</div>
+<script>
+fetch('/waitlist/count').then(r=>r.json()).then(d=>{
+  document.getElementById('counter').textContent = d.count > 0
+    ? `${d.count} empresas ya en lista de espera`
+    : 'Sé de los primeros en acceder';
+}).catch(()=>{});
+document.getElementById('wl').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const fd=new FormData(e.target);
+  const body=Object.fromEntries(fd.entries());
+  const r=await fetch('/waitlist/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(r.ok||r.status===201){
+    e.target.style.display='none';
+    document.getElementById('msg').style.display='block';
+  }
+});
+</script>
+</body>
+</html>

@@ -149,7 +149,7 @@ class TransaccionDB(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     # ---- Revenue split (P0.2 / P0.3 — VERDICT_BUSINESS_MODEL.md) ----
-    # "GMV SurplusAI" (what we invoice) = service_fee + logistics_fee + biomass_revenue.
+    # "GMV TRESAAA Surplus" (what we invoice) = service_fee + logistics_fee + biomass_revenue.
     # `precio_final` is the price of the *food itself* (often €0 or symbolic).
     # Keeping them as separate columns lets the /dashboard endpoint present a
     # clean split without heuristics.
@@ -228,7 +228,7 @@ class UserDB(Base):
 
 
 class SubscriptionPlanDB(Base):
-    """SurplusAI pricing tiers — seeded at startup from the canonical
+    """TRESAAA Surplus pricing tiers — seeded at startup from the canonical
     (Starter / Pro / Enterprise) config in `seed_subscription_plans`.
 
     Per VERDICT_BUSINESS_MODEL.md:
@@ -246,6 +246,19 @@ class SubscriptionPlanDB(Base):
     includes = Column(JSON, default=dict)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class WaitlistEntryDB(Base):
+    __tablename__ = "waitlist_entries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(255), nullable=False)
+    empresa = Column(String(255), nullable=False)
+    email = Column(String(255), nullable=False, index=True)
+    telefono = Column(String(50), default="")
+    sector = Column(String(100), default="")
+    contacted = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 
 def _ensure_transacciones_columns():
