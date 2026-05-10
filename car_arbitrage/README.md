@@ -70,7 +70,26 @@ car_arbitrage/
     └── index.html         # SPA React (CDN) — pestañas Vehículo/Compra/Mercado/Veredicto
 ```
 
-## Quick start
+## Quick start (1 comando)
+
+```bash
+cd car_arbitrage
+./run-local.sh
+# → abre http://localhost:8000
+```
+
+El script crea venv, instala deps, corre tests, y arranca el backend con
+el frontend servido en el mismo origen (sin CORS) en el puerto 8000.
+
+## Quick start con Docker
+
+```bash
+cd car_arbitrage
+docker compose up --build
+# → http://localhost:8000
+```
+
+## Manual (dev)
 
 ```bash
 cd car_arbitrage/backend
@@ -80,13 +99,30 @@ python -m venv .venv
 .venv/bin/uvicorn app.main:app --reload --port 8000
 ```
 
-Y en otra terminal:
+## Deploy a Fly.io
 
 ```bash
-cd car_arbitrage/frontend
-python -m http.server 5500
-# abrir http://localhost:5500
+cd car_arbitrage
+fly launch --no-deploy --copy-config --name car-arbitrage-<sufijo>
+fly volumes create car_arbitrage_data --size 1 --region mad
+fly secrets set CAR_ARBITRAGE_TELEGRAM_BOT_TOKEN=...
+fly secrets set CAR_ARBITRAGE_TELEGRAM_CHAT_ID=...
+fly deploy
 ```
+
+## App móvil (Expo / React Native)
+
+Ver [`mobile/README.md`](./mobile/README.md). Resumen:
+
+```bash
+cd car_arbitrage/mobile
+npm install
+npx expo start
+# escanea QR con Expo Go (iOS / Android) o pulsa i/a para emulador
+```
+
+Editar `mobile/app.json` → `expo.extra.API_BASE` para apuntar al backend
+desplegado.
 
 ## Variables de entorno
 

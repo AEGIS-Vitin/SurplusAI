@@ -1,11 +1,15 @@
 """FastAPI app: análisis de rentabilidad y búsqueda de oportunidades."""
 from __future__ import annotations
 import asyncio
+import os
 from dataclasses import asdict, is_dataclass
+from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from app.core import notifier_telegram, scorer, storage
@@ -190,3 +194,16 @@ async def analyze_with_fetch(req: CombinedRequest):
         req.analysis.comparables = comps
     verdict = scorer.analyze(req.analysis)
     return _serialize(verdict)
+
+
+# Serve frontend SPA (single origin → no CORS surprises)
+_FRONTEND_DIR = Path(os.environ.get(
+    "CAR_ARBITRAGE_FRONTEND_DIR",
+    str(Path(__file__).resolve().parent.parent.parent / "frontend"),
+))
+if _FRONTEND_DIR.is_dir():
+    @app.get("/")
+    async def serve_index() -> FileResponse:
+        return FileResponse(_FRONTEND_DIR / "index.html")
+
+    app.mount("/static", StaticFiles(directory=str(_FRONTEND_DIR)), name="static")

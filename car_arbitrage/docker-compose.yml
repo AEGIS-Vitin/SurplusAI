@@ -1,0 +1,19 @@
+services:
+  car-arbitrage:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: car-arbitrage:local
+    container_name: car-arbitrage
+    ports:
+      - "${PORT:-8000}:8080"
+    environment:
+      - CAR_ARBITRAGE_TELEGRAM_BOT_TOKEN=${CAR_ARBITRAGE_TELEGRAM_BOT_TOKEN:-}
+      - CAR_ARBITRAGE_TELEGRAM_CHAT_ID=${CAR_ARBITRAGE_TELEGRAM_CHAT_ID:-}
+      - OPENLANE_COOKIE=${OPENLANE_COOKIE:-}
+    volumes:
+      - car-arbitrage-data:/data
+    restart: unless-stopped
+
+volumes:
+  car-arbitrage-data:

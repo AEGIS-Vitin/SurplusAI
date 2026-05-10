@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "Car Arbitrage Pro",
+    "slug": "car-arbitrage-pro",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "scheme": "carbarb",
+    "extra": {
+      "API_BASE": "https://car-arbitrage.fly.dev"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.aegisvitin.carbarb"
+    },
+    "android": {
+      "package": "com.aegisvitin.carbarb",
+      "adaptiveIcon": {
+        "backgroundColor": "#1e40af"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}

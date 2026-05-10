@@ -18,7 +18,10 @@
   <script type="text/babel">
     const { useState, useMemo } = React;
 
-    const API_BASE = (window.API_BASE || "http://localhost:8000");
+    // Si servimos desde el backend FastAPI usamos rutas relativas (mismo origen).
+    // Para usar contra un backend remoto: window.API_BASE = "https://tu-api.fly.dev"
+    const API_BASE = window.API_BASE
+      ?? (location.protocol === "file:" ? "http://localhost:8000" : "");
 
     const fmtEur = (n) => (n == null || isNaN(n)) ? "—" :
       new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
