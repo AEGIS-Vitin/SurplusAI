@@ -14,25 +14,43 @@ reales de transporte, aduanas, homologación y reacondicionado.
 
 ## Qué hace
 
-- **Calcula coste total puesto en venta** desde subasta UE (OpenLane/BCA),
+### Fiscalidad y costes
+- **Coste total puesto en venta** desde subasta UE (OpenLane/BCA),
   retail UE o importación extra-UE (Dubái/EAU, Japón, EE.UU., UK).
-- **Aplica IEDMT** según CO2 WLTP, depreciación por antigüedad,
-  excepciones (BEV, histórico, Canarias, Ceuta/Melilla, familia numerosa,
-  discapacidad).
-- **Modela IVA** en los tres regímenes: REBU (margen), general 21%,
-  autoliquidación intracomunitaria, e importación extra-UE.
+- **IEDMT** según CO2 WLTP, depreciación por antigüedad, excepciones
+  (BEV, histórico, Canarias, Ceuta/Melilla, familia numerosa, discapacidad).
+- **IVA** en los tres regímenes: REBU (margen), general 21%, autoliquidación
+  intracomunitaria, e importación extra-UE.
 - **Aduanas extra-UE**: CIF + arancel TARIC 10% + IVA importación 21%
   (o IGIC 7% Canarias) + DUA + inspección esperada.
 - **Transporte**: tabla por origen UE (camión) y extra-UE (RoRo/contenedor).
 - **Homologación**: ficha reducida UE vs homologación individual extra-UE
   con adaptaciones (luces, velocímetro km/h) y provisión de riesgo 15%.
 - **Reacondicionado** estimado por km, edad, segmento, combustible.
+
+### Análisis y decisión
 - **Comparables ES/DE** con regresión robusta Huber para precio justo.
-- **Monte Carlo** 1000 simulaciones: probabilidad de pérdida, VaR 95%,
-  margen esperado.
+- **3 escenarios de venta** (rápida P25×1.05, recomendada P50, paciente P75)
+  con margen, días, ROI anualizado y NPV de cada uno.
+- **Rotación teórica** por segmento (premium alemán, exotic, SUV, city,
+  EV, PHEV, youngtimer, classic…) con LogNormal y velocity score 1-5.
+- **Risk score combinado** (0-100): homologación, rollback, daño estructural,
+  propietarios, libro mantenimiento, liquidez, datos de mercado.
+- **Monte Carlo** 1000 simulaciones: prob. pérdida, prob. margen ≥ 1.500/3.000€,
+  VaR 95%, días esperados a vender.
 - **Puja máxima** que mantiene margen objetivo en escenario P25 venta.
+
+### Ingesta y operación
 - **Scrapers** (OpenLane con cookie, Dubizzle, mobile.de, autoscout24.es/.de,
   coches.net) para autocompletado de comparables y búsqueda de oportunidades.
+- **Bot Telegram dedicado** con env vars `CAR_ARBITRAGE_TELEGRAM_*`
+  (separado de cualquier otro bot del repo). Notifica veredictos con
+  escenarios, ROI, riesgo y enlace al lote. Filtros opcionales: solo verdes,
+  margen mínimo.
+- **Persistencia SQLite** del histórico de análisis y resultados reales de
+  venta (`outcomes`) para calibrar el modelo (`/calibration`).
+- **CLI Typer** (`python -m app.cli`) con comandos `analyze`, `opportunities`,
+  `outcome` y `telegram-test`.
 
 ## Arquitectura
 
@@ -73,22 +91,60 @@ python -m http.server 5500
 ## Variables de entorno
 
 ```bash
-# Solo si vas a usar scraping autenticado de OpenLane
+# Scraping autenticado de OpenLane
 export OPENLANE_COOKIE="session=...; auth=...; ..."
+
+# Bot Telegram dedicado (separado de otros bots del repo)
+export CAR_ARBITRAGE_TELEGRAM_BOT_TOKEN="<token de @BotFather>"
+export CAR_ARBITRAGE_TELEGRAM_CHAT_ID="<tu chat_id>"
+
+# Opcional: ruta DB SQLite (default: ./car_arbitrage.sqlite3)
+export CAR_ARBITRAGE_DB="/var/data/car_arbitrage.sqlite3"
 ```
 
-Para obtener la cookie: inicia sesión en OpenLane en tu navegador, abre
-DevTools → Application → Cookies, copia los pares `nombre=valor`
-separados por `;`.
+**Setup del bot Telegram:**
+1. Habla con `@BotFather` en Telegram → `/newbot` → nombre + username → guarda token.
+2. Inicia conversación con tu bot (envía `/start`).
+3. `curl https://api.telegram.org/bot<TOKEN>/getUpdates` → encuentra `chat.id`.
+4. Exporta las dos variables de entorno arriba.
+5. Test: `python -m app.cli telegram-test`.
+
+**Cookie OpenLane:** inicia sesión en OpenLane en tu navegador, DevTools →
+Application → Cookies, copia los pares `nombre=valor` separados por `;`.
 
 ## Endpoints
 
 | Método | Path                     | Descripción                          |
 |--------|--------------------------|--------------------------------------|
 | GET    | `/health`                | Healthcheck                          |
-| POST   | `/analyze`               | Análisis con comparables aportados   |
+| POST   | `/analyze`               | Análisis con comparables aportados (guarda en SQLite por defecto) |
 | POST   | `/search`                | Búsqueda multi-portal                |
 | POST   | `/analyze-with-fetch`    | Análisis + auto-scrape comparables   |
+| POST   | `/notify`                | Envía un veredicto a Telegram        |
+| GET    | `/opportunities`         | Top oportunidades verdes históricas  |
+| GET    | `/recent`                | Análisis recientes                   |
+| POST   | `/outcome`               | Registra resultado real de venta     |
+| GET    | `/calibration`           | Métricas de calibración              |
+
+## CLI
+
+```bash
+# Análisis con comparables vía stdin (JSON list)
+echo '[{"source":"coches.net","market":"ES","price_eur":22500,"km":88000,"year":2020}, ...]' \
+  | python -m app.cli analyze \
+      --make BMW --model "Serie 3" --version 320d --year 2020 --km 95000 \
+      --fuel diesel --co2-wltp 145 --price 14500 --origin DE \
+      --channel eu_auction --vat rebu --comparables-json - --notify
+
+# Top oportunidades
+python -m app.cli opportunities --min-margin 2000 --max-risk 30
+
+# Registrar venta real (calibración)
+python -m app.cli outcome --analysis-id 12 --sold-eur 22300 --days 28
+
+# Test bot Telegram
+python -m app.cli telegram-test
+```
 
 ## Limitaciones conocidas
 

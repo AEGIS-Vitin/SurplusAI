@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from app.core import scorer
+from app.core import notifier_telegram, scorer, storage
 from app.models.vehicle import AnalysisRequest, Comparable
 from app.scrapers.autoscout24 import AutoScout24Scraper
 from app.scrapers.coches_net import CochesNetScraper
@@ -43,12 +43,66 @@ async def health():
 
 
 @app.post("/analyze")
-async def analyze_endpoint(req: AnalysisRequest):
+async def analyze_endpoint(req: AnalysisRequest, save: bool = True):
     try:
         verdict = scorer.analyze(req)
-        return _serialize(verdict)
+        out = _serialize(verdict)
+        if save:
+            try:
+                aid = storage.save_analysis(req.model_dump(), out)
+                out["_analysis_id"] = aid
+            except Exception:
+                pass
+        return out
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"analyze failed: {e}")
+
+
+class NotifyRequest(BaseModel):
+    verdict: dict
+    source_url: str | None = None
+    only_if_green: bool = False
+    min_margin_eur: float = 0.0
+
+
+@app.post("/notify")
+async def notify_endpoint(req: NotifyRequest):
+    """Envía un veredicto al chat de Telegram configurado."""
+    return await notifier_telegram.notify_verdict(
+        req.verdict, source_url=req.source_url,
+        only_if_green=req.only_if_green, min_margin_eur=req.min_margin_eur,
+    )
+
+
+@app.get("/opportunities")
+async def opportunities_endpoint(min_margin: float = 1500, max_risk: int = 35, limit: int = 20):
+    """Top oportunidades verdes históricas guardadas en SQLite."""
+    return {"results": storage.top_opportunities(min_margin, max_risk, limit)}
+
+
+@app.get("/recent")
+async def recent_endpoint(limit: int = 20, label_prefix: str | None = None):
+    return {"results": storage.list_recent(limit, label_prefix)}
+
+
+class OutcomeRequest(BaseModel):
+    analysis_id: int
+    actual_sale_eur: float
+    actual_days_to_sell: float
+    notes: str = ""
+
+
+@app.post("/outcome")
+async def outcome_endpoint(req: OutcomeRequest):
+    oid = storage.record_sale_outcome(
+        req.analysis_id, req.actual_sale_eur, req.actual_days_to_sell, req.notes,
+    )
+    return {"outcome_id": oid, "calibration": storage.calibration_stats()}
+
+
+@app.get("/calibration")
+async def calibration_endpoint():
+    return storage.calibration_stats()
 
 
 class SearchRequest(BaseModel):
