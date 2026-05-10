@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Car Arbitrage Pro</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    .num { font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+
+    const API_BASE = (window.API_BASE || "http://localhost:8000");
+
+    const fmtEur = (n) => (n == null || isNaN(n)) ? "—" :
+      new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
+    const fmtPct = (n) => (n == null || isNaN(n)) ? "—" : (n * 100).toFixed(1) + "%";
+
+    const FUELS = [
+      ["gasoline", "Gasolina"], ["diesel", "Diésel"], ["hev", "HEV"],
+      ["mhev", "MHEV"], ["phev", "PHEV"], ["bev", "BEV (eléctrico)"],
+      ["lpg", "GLP"], ["cng", "GNC"], ["hydrogen", "H2"],
+    ];
+    const ORIGINS = [
+      ["eu_auction", "Subasta UE (OpenLane/BCA)"],
+      ["eu_retail_pro", "Retail UE profesional (IVA deducible)"],
+      ["eu_retail_pro_rebu", "Retail UE profesional REBU"],
+      ["eu_retail_private", "Retail UE particular"],
+      ["extra_eu", "Extra-UE (Dubái, Japón, EE.UU., UK)"],
+    ];
+    const VAT = [
+      ["rebu", "REBU"], ["general", "General 21%"], ["import_extra_eu", "Importación extra-UE"],
+    ];
+
+    function App() {
+      const [tab, setTab] = useState("vehicle");
+      const [loading, setLoading] = useState(false);
+      const [verdict, setVerdict] = useState(null);
+      const [error, setError] = useState(null);
+
+      const [v, setV] = useState({
+        make: "BMW", model: "Serie 3", version: "320d", year: 2020, km: 95000,
+        fuel: "diesel", power_cv: 190, power_kw: 140, displacement_cc: 1995,
+        co2_wltp: 145, euro_norm: "6d", transmission: "automatic", drive: "rwd",
+        seats: 5, vin: "", origin_country: "DE", has_coc: true,
+        has_service_book: true, previous_owners: 2, declared_damages: "",
+      });
+      const [req, setReq] = useState({
+        origin: "eu_auction", purchase_price: 14500, purchase_currency: "EUR",
+        fx_rate_to_eur: 1.0, auction_fee_pct: 0.055, auction_flat_fee: 150,
+        target_margin_pct: 0.12, sell_market: "ES", vat_regime: "rebu",
+        canary_islands: false, days_in_stock: 35, capital_cost_annual: 0.08,
+        income_tax_rate: 0.25,
+      });
+      const [comps, setComps] = useState([
+        { source: "coches.net", market: "ES", price_eur: 22500, km: 88000, year: 2020 },
+        { source: "coches.net", market: "ES", price_eur: 21000, km: 105000, year: 2020 },
+        { source: "coches.net", market: "ES", price_eur: 23500, km: 75000, year: 2021 },
+        { source: "autoscout24.es", market: "ES", price_eur: 22000, km: 92000, year: 2020 },
+        { source: "autoscout24.es", market: "ES", price_eur: 24000, km: 70000, year: 2021 },
+        { source: "mobile.de", market: "DE", price_eur: 19500, km: 88000, year: 2020 },
+        { source: "mobile.de", market: "DE", price_eur: 18900, km: 96000, year: 2020 },
+        { source: "mobile.de", market: "DE", price_eur: 20800, km: 78000, year: 2020 },
+      ]);
+      const [autoFetch, setAutoFetch] = useState(false);
+
+      const update = (setter, key) => (e) => {
+        const val = e.target.type === "checkbox" ? e.target.checked
+          : e.target.type === "number" ? Number(e.target.value)
+          : e.target.value;
+        setter((s) => ({ ...s, [key]: val }));
+      };
+
+      async function analyze() {
+        setLoading(true); setError(null); setVerdict(null);
+        try {
+          const body = {
+            analysis: { ...req, vehicle: v, comparables: comps },
+            auto_fetch_comparables: autoFetch,
+          };
+          const res = await fetch(`${API_BASE}/analyze-with-fetch`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          if (!res.ok) throw new Error(await res.text());
+          setVerdict(await res.json());
+          setTab("verdict");
+        } catch (e) {
+          setError(String(e));
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      const TabBtn = ({ id, children }) => (
+        <button onClick={() => setTab(id)}
+          className={"px-4 py-2 rounded-t-lg font-medium " + (tab === id ? "bg-white border-b-2 border-blue-600 text-blue-700" : "text-slate-500 hover:text-slate-700")}>
+          {children}
+        </button>
+      );
+
+      const Field = ({ label, children, hint }) => (
+        <label className="block text-sm">
+          <span className="text-slate-600">{label}</span>
+          {children}
+          {hint && <span className="block text-xs text-slate-400 mt-0.5">{hint}</span>}
+        </label>
+      );
+
+      const Input = (props) => (
+        <input {...props} className="mt-1 w-full rounded border-slate-300 border px-2 py-1.5 num focus:ring-2 focus:ring-blue-500 outline-none" />
+      );
+      const Select = ({ children, ...p }) => (
+        <select {...p} className="mt-1 w-full rounded border-slate-300 border px-2 py-1.5 bg-white">{children}</select>
+      );
+
+      return (
+        <div className="max-w-6xl mx-auto p-4">
+          <header className="mb-6">
+            <h1 className="text-3xl font-bold">🚗 Car Arbitrage Pro</h1>
+            <p className="text-sm text-slate-500">
+              IEDMT · IVA/REBU · Aduanas extra-UE · Homologación · Comparables ES/DE · Monte Carlo
+            </p>
+          </header>
+
+          <div className="border-b border-slate-200 mb-4 flex gap-1">
+            <TabBtn id="vehicle">1. Vehículo</TabBtn>
+            <TabBtn id="purchase">2. Compra</TabBtn>
+            <TabBtn id="market">3. Mercado</TabBtn>
+            <TabBtn id="verdict">4. Veredicto</TabBtn>
+          </div>
+
+          {tab === "vehicle" && (
+            <div className="bg-white p-5 rounded-lg shadow-sm grid grid-cols-2 md:grid-cols-3 gap-4">
+              <Field label="Marca"><Input value={v.make} onChange={update(setV, "make")} /></Field>
+              <Field label="Modelo"><Input value={v.model} onChange={update(setV, "model")} /></Field>
+              <Field label="Versión"><Input value={v.version || ""} onChange={update(setV, "version")} /></Field>
+              <Field label="Año"><Input type="number" value={v.year} onChange={update(setV, "year")} /></Field>
+              <Field label="Km"><Input type="number" value={v.km} onChange={update(setV, "km")} /></Field>
+              <Field label="Combustible">
+                <Select value={v.fuel} onChange={update(setV, "fuel")}>
+                  {FUELS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+                </Select>
+              </Field>
+              <Field label="CV"><Input type="number" value={v.power_cv || ""} onChange={update(setV, "power_cv")} /></Field>
+              <Field label="kW"><Input type="number" value={v.power_kw || ""} onChange={update(setV, "power_kw")} /></Field>
+              <Field label="Cilindrada (cc)"><Input type="number" value={v.displacement_cc || ""} onChange={update(setV, "displacement_cc")} /></Field>
+              <Field label="CO₂ WLTP (g/km)" hint="Clave para IEDMT"><Input type="number" value={v.co2_wltp || ""} onChange={update(setV, "co2_wltp")} /></Field>
+              <Field label="Norma Euro"><Input value={v.euro_norm || ""} onChange={update(setV, "euro_norm")} /></Field>
+              <Field label="Cambio">
+                <Select value={v.transmission || ""} onChange={update(setV, "transmission")}>
+                  <option value="">—</option><option value="manual">Manual</option><option value="automatic">Automático</option>
+                </Select>
+              </Field>
+              <Field label="País origen (ISO-2)" hint="DE, FR, AE (Dubái), JP, US, UK..."><Input value={v.origin_country} onChange={update(setV, "origin_country")} /></Field>
+              <Field label="Propietarios"><Input type="number" value={v.previous_owners || 0} onChange={update(setV, "previous_owners")} /></Field>
+              <Field label="VIN"><Input value={v.vin || ""} onChange={update(setV, "vin")} /></Field>
+              <label className="flex items-center gap-2 mt-6"><input type="checkbox" checked={v.has_coc} onChange={update(setV, "has_coc")} /><span className="text-sm">Tiene COC</span></label>
+              <label className="flex items-center gap-2 mt-6"><input type="checkbox" checked={v.has_service_book} onChange={update(setV, "has_service_book")} /><span className="text-sm">Libro mantenimiento</span></label>
+              <Field label="Daños declarados"><Input value={v.declared_damages || ""} onChange={update(setV, "declared_damages")} placeholder="ej. cosméticos / estructurales / ninguno" /></Field>
+            </div>
+          )}
+
+          {tab === "purchase" && (
+            <div className="bg-white p-5 rounded-lg shadow-sm grid grid-cols-2 md:grid-cols-3 gap-4">
+              <Field label="Origen / canal">
+                <Select value={req.origin} onChange={update(setReq, "origin")}>
+                  {ORIGINS.map(([id, l]) => <option key={id} value={id}>{l}</option>)}
+                </Select>
+              </Field>
+              <Field label="Régimen IVA aplicable">
+                <Select value={req.vat_regime} onChange={update(setReq, "vat_regime")}>
+                  {VAT.map(([id, l]) => <option key={id} value={id}>{l}</option>)}
+                </Select>
+              </Field>
+              <Field label="Canarias"><Select value={req.canary_islands} onChange={(e) => setReq(s => ({ ...s, canary_islands: e.target.value === "true" }))}>
+                <option value="false">No</option><option value="true">Sí (IGIC 7%)</option>
+              </Select></Field>
+              <Field label="Precio adjudicación / venta"><Input type="number" value={req.purchase_price} onChange={update(setReq, "purchase_price")} /></Field>
+              <Field label="Moneda compra">
+                <Select value={req.purchase_currency} onChange={update(setReq, "purchase_currency")}>
+                  <option>EUR</option><option>USD</option><option>AED</option><option>GBP</option><option>JPY</option>
+                </Select>
+              </Field>
+              <Field label="FX a EUR (override)" hint="Deja 1 para usar default"><Input type="number" step="0.0001" value={req.fx_rate_to_eur} onChange={update(setReq, "fx_rate_to_eur")} /></Field>
+              <Field label="Comisión subasta %"><Input type="number" step="0.001" value={req.auction_fee_pct} onChange={update(setReq, "auction_fee_pct")} /></Field>
+              <Field label="Fee fijo subasta (€)"><Input type="number" value={req.auction_flat_fee} onChange={update(setReq, "auction_flat_fee")} /></Field>
+              <Field label="Margen objetivo % (puja máx)"><Input type="number" step="0.01" value={req.target_margin_pct} onChange={update(setReq, "target_margin_pct")} /></Field>
+              <Field label="Días stock estimados"><Input type="number" value={req.days_in_stock} onChange={update(setReq, "days_in_stock")} /></Field>
+              <Field label="Coste capital anual"><Input type="number" step="0.01" value={req.capital_cost_annual} onChange={update(setReq, "capital_cost_annual")} /></Field>
+              <Field label="Tipo IRPF/IS sobre beneficio"><Input type="number" step="0.01" value={req.income_tax_rate} onChange={update(setReq, "income_tax_rate")} /></Field>
+            </div>
+          )}
+
+          {tab === "market" && (
+            <div className="bg-white p-5 rounded-lg shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold">Comparables (ES / DE)</h3>
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={autoFetch} onChange={(e) => setAutoFetch(e.target.checked)} />
+                  Auto-fetch (coches.net, autoscout24, mobile.de)
+                </label>
+              </div>
+              <p className="text-xs text-slate-500 mb-3">Edita o pega comparables. Mín 5 ES recomendado para veredicto sólido. Auto-fetch hace scraping al pulsar Analizar.</p>
+              <table className="w-full text-sm">
+                <thead className="text-left text-slate-500"><tr><th>Fuente</th><th>Mercado</th><th>Precio €</th><th>Km</th><th>Año</th><th></th></tr></thead>
+                <tbody>
+                  {comps.map((c, i) => (
+                    <tr key={i} className="border-t">
+                      <td><input className="w-32 px-1 py-1" value={c.source} onChange={(e) => setComps(cs => cs.map((x, j) => j === i ? { ...x, source: e.target.value } : x))} /></td>
+                      <td><select className="px-1 py-1" value={c.market} onChange={(e) => setComps(cs => cs.map((x, j) => j === i ? { ...x, market: e.target.value } : x))}>
+                        <option>ES</option><option>DE</option><option>FR</option><option>IT</option><option>PT</option><option>NL</option><option>AE</option><option>UK</option>
+                      </select></td>
+                      <td><input type="number" className="w-24 px-1 py-1 num" value={c.price_eur} onChange={(e) => setComps(cs => cs.map((x, j) => j === i ? { ...x, price_eur: Number(e.target.value) } : x))} /></td>
+                      <td><input type="number" className="w-24 px-1 py-1 num" value={c.km} onChange={(e) => setComps(cs => cs.map((x, j) => j === i ? { ...x, km: Number(e.target.value) } : x))} /></td>
+                      <td><input type="number" className="w-20 px-1 py-1 num" value={c.year} onChange={(e) => setComps(cs => cs.map((x, j) => j === i ? { ...x, year: Number(e.target.value) } : x))} /></td>
+                      <td><button onClick={() => setComps(cs => cs.filter((_, j) => j !== i))} className="text-red-600 text-xs">×</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <button onClick={() => setComps(cs => [...cs, { source: "manual", market: "ES", price_eur: 0, km: 0, year: new Date().getFullYear() - 2 }])} className="mt-3 px-3 py-1.5 bg-slate-100 rounded text-sm">+ Añadir fila</button>
+            </div>
+          )}
+
+          {tab === "verdict" && (
+            <div className="bg-white p-5 rounded-lg shadow-sm">
+              {!verdict && !loading && <p className="text-slate-500">Pulsa "Analizar" abajo para calcular.</p>}
+              {loading && <p className="text-slate-500">Calculando…</p>}
+              {error && <pre className="text-red-600 text-xs whitespace-pre-wrap">{error}</pre>}
+              {verdict && <Verdict v={verdict} />}
+            </div>
+          )}
+
+          <div className="mt-6 flex items-center gap-3">
+            <button onClick={analyze} disabled={loading}
+              className="px-6 py-2.5 bg-blue-600 text-white rounded font-medium disabled:opacity-50">
+              {loading ? "Analizando…" : "Analizar rentabilidad"}
+            </button>
+            {verdict && <span className={"text-2xl font-bold " + verdictColor(verdict.label)}>{verdict.label}</span>}
+            {verdict && <span className="text-sm text-slate-500">Margen {fmtEur(verdict.margin_eur)} ({fmtPct(verdict.margin_pct)})</span>}
+          </div>
+        </div>
+      );
+    }
+
+    function verdictColor(label) {
+      if (!label) return "";
+      if (label.startsWith("🟢")) return "text-green-600";
+      if (label.startsWith("🟡")) return "text-amber-600";
+      if (label.startsWith("🔴")) return "text-red-600";
+      return "text-slate-700";
+    }
+
+    function Verdict({ v }) {
+      const cb = v.cost_breakdown || {};
+      return (
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+            <Stat label="Coste total" value={fmtEur(v.cost_total_eur)} />
+            <Stat label="Venta esperada" value={fmtEur(v.expected_sale_eur)} />
+            <Stat label="Margen €" value={fmtEur(v.margin_eur)} />
+            <Stat label="Margen %" value={fmtPct(v.margin_pct)} />
+            <Stat label="Margen post-IRPF/IS" value={fmtEur(v.margin_after_tax_eur)} />
+            <Stat label="Puja máx recomendada" value={fmtEur(v.max_bid_eur)} />
+            <Stat label="Prob. pérdida (MC)" value={fmtPct(v.monte_carlo?.prob_loss)} />
+            <Stat label="VaR 95%" value={fmtEur(v.monte_carlo?.var95_eur)} />
+          </div>
+
+          {v.flags?.length > 0 && (
+            <div className="bg-amber-50 border-l-4 border-amber-500 p-3 text-sm">
+              <strong>Avisos:</strong>
+              <ul className="list-disc ml-5">{v.flags.map((f, i) => <li key={i}>{f}</li>)}</ul>
+            </div>
+          )}
+
+          <details open><summary className="font-semibold cursor-pointer">Desglose de costes</summary>
+            <table className="w-full text-sm mt-2">
+              <tbody>
+                <Row k="Adquisición" v={cb.purchase} />
+                <Row k="Comisión subasta (IVA incl.)" v={cb.auction_fees} />
+                <Row k="Transporte" v={cb.transport} />
+                <Row k="Aduanas (CIF + arancel + IVA imp + DUA)" v={cb.customs} />
+                <Row k="IEDMT" v={cb.iedmt} />
+                <Row k="Homologación + matriculación" v={cb.homologation} />
+                <Row k="Reacondicionado" v={cb.reconditioning} />
+                <Row k="Coste capital" v={cb.capital_cost} />
+                <Row k="Operativos (publicación, garantía, seguro)" v={cb.operational} />
+                <Row k="Provisión riesgo homologación extra-UE" v={cb.homologation_risk_provision} />
+                <Row k="TOTAL" v={cb.total} bold />
+              </tbody>
+            </table>
+          </details>
+
+          <details><summary className="font-semibold cursor-pointer">IEDMT</summary>
+            <pre className="text-xs bg-slate-50 p-2 rounded overflow-x-auto">{JSON.stringify(v.iedmt_detail, null, 2)}</pre>
+          </details>
+
+          {v.customs_detail && (
+            <details><summary className="font-semibold cursor-pointer">Aduanas (extra-UE)</summary>
+              <pre className="text-xs bg-slate-50 p-2 rounded overflow-x-auto">{JSON.stringify(v.customs_detail, null, 2)}</pre>
+            </details>
+          )}
+
+          <details><summary className="font-semibold cursor-pointer">IVA / régimen</summary>
+            <pre className="text-xs bg-slate-50 p-2 rounded overflow-x-auto">{JSON.stringify(v.vat_detail, null, 2)}</pre>
+          </details>
+
+          <details><summary className="font-semibold cursor-pointer">Reacondicionado</summary>
+            <pre className="text-xs bg-slate-50 p-2 rounded overflow-x-auto">{JSON.stringify(v.reconditioning_detail, null, 2)}</pre>
+          </details>
+
+          <details><summary className="font-semibold cursor-pointer">Homologación</summary>
+            <pre className="text-xs bg-slate-50 p-2 rounded overflow-x-auto">{JSON.stringify(v.homologation_detail, null, 2)}</pre>
+          </details>
+
+          <details><summary className="font-semibold cursor-pointer">Mercado ES / DE</summary>
+            <div className="grid md:grid-cols-2 gap-4 mt-2 text-xs">
+              <div><strong>España:</strong><pre className="bg-slate-50 p-2 rounded overflow-x-auto">{JSON.stringify(v.market_stats_es, null, 2)}</pre></div>
+              <div><strong>Alemania:</strong><pre className="bg-slate-50 p-2 rounded overflow-x-auto">{JSON.stringify(v.market_stats_de, null, 2)}</pre></div>
+            </div>
+          </details>
+
+          <details><summary className="font-semibold cursor-pointer">Monte Carlo (1000 sims)</summary>
+            <pre className="text-xs bg-slate-50 p-2 rounded">{JSON.stringify(v.monte_carlo, null, 2)}</pre>
+          </details>
+        </div>
+      );
+    }
+
+    function Stat({ label, value }) {
+      return (
+        <div className="bg-slate-50 rounded p-3">
+          <div className="text-xs text-slate-500">{label}</div>
+          <div className="text-lg font-semibold num">{value}</div>
+        </div>
+      );
+    }
+    function Row({ k, v, bold }) {
+      return (
+        <tr className={"border-t " + (bold ? "font-semibold" : "")}>
+          <td className="py-1">{k}</td>
+          <td className="py-1 text-right num">{fmtEur(v)}</td>
+        </tr>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
