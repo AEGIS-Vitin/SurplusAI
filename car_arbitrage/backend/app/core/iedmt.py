@@ -4,6 +4,7 @@ Base = valor fiscal Hacienda × coeficiente de depreciación por antigüedad.
 Tipo según emisiones CO2 WLTP. BEV exento (0%). Canarias tipos reducidos.
 """
 from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Optional
 

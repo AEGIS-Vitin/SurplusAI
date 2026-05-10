@@ -4,6 +4,7 @@ Sin dependencias externas (sqlite3 builtin). Para producción real considera
 postgres + alembic, pero esto es suficiente para auditoría y calibración.
 """
 from __future__ import annotations
+
 import json
 import os
 import sqlite3

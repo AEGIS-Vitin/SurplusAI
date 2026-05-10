@@ -11,6 +11,7 @@ factura sin IVA, autoliquidación en 303 (IVA soportado y repercutido se
 compensan si derecho a deducción 100%).
 """
 from __future__ import annotations
+
 from dataclasses import dataclass
 
 VAT_RATE_ES = 0.21

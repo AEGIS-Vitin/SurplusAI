@@ -5,6 +5,7 @@ HTML cambia con frecuencia. Este scraper apunta a la web pública y devuelve
 listings con precio en AED → conversión a EUR vía core.fx.
 """
 from __future__ import annotations
+
 import re
 from typing import Optional
 

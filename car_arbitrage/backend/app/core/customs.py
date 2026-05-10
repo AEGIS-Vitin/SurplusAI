@@ -6,6 +6,7 @@ Base aduana = CIF = Precio + Flete + Seguro (todo en EUR).
 - DUA / agente aduanas: 280-500€
 """
 from __future__ import annotations
+
 from dataclasses import dataclass
 
 VAT_RATE_ES = 0.21

@@ -7,12 +7,12 @@ el log de la mediana — captura cola larga (algunos coches venden lentos).
 Velocity score: 1 = muy rápido (<25 días), 5 = muy lento (>90 días).
 """
 from __future__ import annotations
+
 from dataclasses import dataclass
 
 import numpy as np
 
 from app.models.vehicle import FuelType, Vehicle
-
 
 SEGMENT_DAYS = {
     "premium_german": 35,        # BMW/Mercedes/Audi <50k €

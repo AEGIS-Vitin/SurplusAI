@@ -5,6 +5,7 @@ API privado mejor usar httpx con headers correctos. Este scraper devuelve
 best-effort sobre la página HTML.
 """
 from __future__ import annotations
+
 import re
 from typing import Optional
 

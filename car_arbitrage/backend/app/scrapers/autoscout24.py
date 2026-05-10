@@ -1,5 +1,6 @@
 """autoscout24 (.es y .de). Mismo motor, dos dominios."""
 from __future__ import annotations
+
 import re
 from typing import Optional
 

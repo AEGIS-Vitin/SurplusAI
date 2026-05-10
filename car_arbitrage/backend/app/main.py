@@ -1,5 +1,6 @@
 """FastAPI app: análisis de rentabilidad y búsqueda de oportunidades."""
 from __future__ import annotations
+
 import asyncio
 import os
 from dataclasses import asdict, is_dataclass
@@ -129,22 +130,28 @@ async def search_endpoint(req: SearchRequest):
 
     if "coches.net" in req.sources:
         s = CochesNetScraper()
-        scrapers.append(s); tasks.append(s.search(query))
+        scrapers.append(s)
+        tasks.append(s.search(query))
     if "autoscout24.es" in req.sources:
         s = AutoScout24Scraper(country="es")
-        scrapers.append(s); tasks.append(s.search(query))
+        scrapers.append(s)
+        tasks.append(s.search(query))
     if "autoscout24.de" in req.sources:
         s = AutoScout24Scraper(country="de")
-        scrapers.append(s); tasks.append(s.search(query))
+        scrapers.append(s)
+        tasks.append(s.search(query))
     if "mobile.de" in req.sources:
         s = MobileDeScraper()
-        scrapers.append(s); tasks.append(s.search(query))
+        scrapers.append(s)
+        tasks.append(s.search(query))
     if "dubizzle" in req.sources:
         s = DubizzleScraper()
-        scrapers.append(s); tasks.append(s.search(query))
+        scrapers.append(s)
+        tasks.append(s.search(query))
     if "openlane" in req.sources:
         s = OpenLaneScraper()
-        scrapers.append(s); tasks.append(s.search(query))
+        scrapers.append(s)
+        tasks.append(s.search(query))
 
     try:
         results = await asyncio.gather(*tasks, return_exceptions=True)

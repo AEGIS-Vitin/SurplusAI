@@ -4,6 +4,7 @@ UE con COC: ficha técnica reducida ITV.
 Extra-UE: homologación individual obligatoria + adaptaciones (luces, etc.).
 """
 from __future__ import annotations
+
 from dataclasses import dataclass
 
 EU_COUNTRIES = {

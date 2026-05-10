@@ -1,7 +1,12 @@
 """Smoke test del flujo completo end-to-end."""
 from app.core import scorer
 from app.models.vehicle import (
-    AnalysisRequest, Comparable, FuelType, Origin, VATRegime, Vehicle,
+    AnalysisRequest,
+    Comparable,
+    FuelType,
+    Origin,
+    VATRegime,
+    Vehicle,
 )
 
 

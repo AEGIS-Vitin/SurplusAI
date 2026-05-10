@@ -1,5 +1,6 @@
 """Risk score combinado (0-100) con desglose por factor."""
 from __future__ import annotations
+
 from dataclasses import dataclass
 
 from app.models.vehicle import Origin, Vehicle

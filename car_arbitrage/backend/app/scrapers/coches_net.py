@@ -1,5 +1,6 @@
 """coches.net — España. Para precio de venta esperado."""
 from __future__ import annotations
+
 import re
 from typing import Optional
 

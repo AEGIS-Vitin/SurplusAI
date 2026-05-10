@@ -1,5 +1,6 @@
 """Transporte: tablas medias por origen → España península."""
 from __future__ import annotations
+
 from dataclasses import dataclass
 
 EU_TRUCK_TABLE = {

@@ -1,4 +1,4 @@
-from app.core import rotation, risk
+from app.core import risk, rotation
 from app.models.vehicle import FuelType, Origin, Vehicle
 
 

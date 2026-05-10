@@ -4,7 +4,12 @@ import tempfile
 from app.core import scorer, storage
 from app.core.notifier_telegram import format_verdict_message
 from app.models.vehicle import (
-    AnalysisRequest, Comparable, FuelType, Origin, VATRegime, Vehicle,
+    AnalysisRequest,
+    Comparable,
+    FuelType,
+    Origin,
+    VATRegime,
+    Vehicle,
 )
 
 
@@ -54,9 +59,6 @@ def test_storage_save_and_list():
     with tempfile.TemporaryDirectory() as tmp:
         db = os.path.join(tmp, "test.sqlite3")
         verdict = scorer.analyze(_request())
-        from dataclasses import asdict
-        vd = asdict(verdict)
-        # Convert market stats, etc - storage uses dicts; serialize what we have
         from app.main import _serialize
         vd_ser = _serialize(verdict)
         aid = storage.save_analysis(_request().model_dump(), vd_ser, db_path=db)

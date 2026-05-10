@@ -9,6 +9,7 @@ Uso típico:
   python -m app.cli outcome --analysis-id 12 --sold-eur 22300 --days 28
 """
 from __future__ import annotations
+
 import asyncio
 import json
 import sys
@@ -19,7 +20,12 @@ import typer
 
 from app.core import notifier_telegram, scorer, storage
 from app.models.vehicle import (
-    AnalysisRequest, Comparable, FuelType, Origin, VATRegime, Vehicle,
+    AnalysisRequest,
+    Comparable,
+    FuelType,
+    Origin,
+    VATRegime,
+    Vehicle,
 )
 
 app = typer.Typer(help="Car Arbitrage Pro — calculadora y notificador de oportunidades.")

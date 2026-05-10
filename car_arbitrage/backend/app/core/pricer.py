@@ -4,6 +4,7 @@ Devuelve P25/P50/P75, std, y un precio justo ajustado al km y año del coche
 objetivo mediante regresión Huber sobre los comparables del mercado dado.
 """
 from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Sequence
 

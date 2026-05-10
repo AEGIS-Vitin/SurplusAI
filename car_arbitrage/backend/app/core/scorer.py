@@ -4,16 +4,26 @@ Devuelve coste total, escenarios de venta (rápida/recomendada/paciente),
 ROI anualizado, NPV, risk score combinado, rotación teórica y Monte Carlo.
 """
 from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import Optional
 
 import numpy as np
 
-from app.core import customs, fx, homologation, iedmt, pricer, reconditioning, risk, rotation, transport, vat_regimes
+from app.core import (
+    customs,
+    fx,
+    homologation,
+    iedmt,
+    pricer,
+    reconditioning,
+    risk,
+    rotation,
+    transport,
+    vat_regimes,
+)
 from app.models.vehicle import (
     AnalysisRequest,
-    Comparable,
-    FuelType,
     Origin,
     VATRegime,
     Vehicle,

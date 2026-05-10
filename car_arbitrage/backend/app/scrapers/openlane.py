@@ -5,6 +5,7 @@ ATENCIÓN: el ToS de OpenLane puede prohibir scraping automatizado. Uso
 exclusivo del comprador autenticado, bajo su responsabilidad.
 """
 from __future__ import annotations
+
 import os
 import re
 from typing import Optional

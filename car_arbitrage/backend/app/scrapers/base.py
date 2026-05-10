@@ -5,8 +5,8 @@ responsable de cumplir robots.txt y los términos de servicio. Este código
 incluye rate-limit y backoff por defecto y NO se usa en CI.
 """
 from __future__ import annotations
+
 import asyncio
-import os
 import time
 from dataclasses import dataclass, field
 from typing import Optional

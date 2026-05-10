@@ -1,5 +1,6 @@
 """Estimador de coste de reacondicionado por km, edad, segmento."""
 from __future__ import annotations
+
 from dataclasses import dataclass
 
 from app.models.vehicle import FuelType, Vehicle
