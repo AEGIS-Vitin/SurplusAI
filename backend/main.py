@@ -1627,7 +1627,13 @@ async def waitlist_count(db: Session = Depends(database.get_db)):
     return {"count": count}
 
 @app.get("/waitlist/admin", tags=["Waitlist"])
-async def waitlist_list(db: Session = Depends(database.get_db), current_user: auth.UserDB = Depends(auth.get_current_user)):
+async def waitlist_list(
+    token: Optional[str] = Depends(extract_token),
+    db: Session = Depends(database.get_db),
+):
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    current_user = auth.get_current_user(token, db)
     if current_user.rol != "admin":
         raise HTTPException(403, "Solo admins")
     entries = db.query(database.WaitlistEntryDB).order_by(database.WaitlistEntryDB.created_at.desc()).all()
