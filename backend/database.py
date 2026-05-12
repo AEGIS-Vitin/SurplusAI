@@ -289,6 +289,64 @@ class PdfCertificateDB(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 
+class AffiliateDB(Base):
+    """Programa de afiliados (Sprint 27).
+
+    Gestoría / asesoría / comercial registra como afiliado, recibe code único.
+    Cuando un cliente se suscribe usando ?ref=CODE, se asigna a este afiliado.
+    Comisión: 20% recurrente sobre la suscripción.
+    """
+    __tablename__ = "affiliates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    code = Column(String(32), unique=True, nullable=False, index=True)
+    user_email = Column(String(255), nullable=False, index=True)
+    nombre = Column(String(255), nullable=False)
+    organizacion = Column(String(255), nullable=True)
+    commission_pct = Column(Float, default=20.0, nullable=False)
+    payout_iban = Column(String(64), nullable=True)
+    total_referrals = Column(Integer, default=0, nullable=False)
+    total_paid_eur = Column(Float, default=0.0, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class AffiliateReferralDB(Base):
+    """Referencia individual: cliente captado por afiliado."""
+    __tablename__ = "affiliate_referrals"
+
+    id = Column(Integer, primary_key=True, index=True)
+    affiliate_id = Column(Integer, ForeignKey("affiliates.id"), nullable=False, index=True)
+    user_email = Column(String(255), nullable=False, index=True)
+    tier_at_signup = Column(String(32), nullable=True)
+    commission_eur_to_date = Column(Float, default=0.0, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class EmailCampaignLogDB(Base):
+    """Log de envíos email drip campaigns (Sprint 28)."""
+    __tablename__ = "email_campaign_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_email = Column(String(255), nullable=False, index=True)
+    campaign = Column(String(64), nullable=False, index=True)  # welcome | day3 | day7 | churn_rescue
+    sent_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    opened_at = Column(DateTime, nullable=True)
+    clicked_at = Column(DateTime, nullable=True)
+
+
+class ABEventDB(Base):
+    """Eventos A/B persistidos (sprint 26 mejora del Sprint 16)."""
+    __tablename__ = "ab_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    variant = Column(String(32), nullable=False, index=True)
+    event = Column(String(64), nullable=False, index=True)  # impression | cta_click | signup | conversion
+    user_email = Column(String(255), nullable=True, index=True)
+    extra = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
 class MagicLinkTokenDB(Base):
     """Tokens de magic-link para auth sin password.
 

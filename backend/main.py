@@ -30,6 +30,7 @@ import desperdicio_stripe
 import desperdicio_ocr
 import desperdicio_bulk
 import desperdicio_extras
+import desperdicio_growth
 
 
 # ---- TRESAAA Surplus pricing constants (P0.2 — see VERDICT_BUSINESS_MODEL.md) ----
@@ -134,6 +135,7 @@ app.include_router(desperdicio_stripe.router)
 app.include_router(desperdicio_ocr.router)
 app.include_router(desperdicio_bulk.router)
 app.include_router(desperdicio_extras.router)
+app.include_router(desperdicio_growth.router)
 
 
 # Dependency for database session
