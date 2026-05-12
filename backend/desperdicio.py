@@ -27,15 +27,53 @@ import os
 from datetime import datetime, timedelta
 from typing import Optional, List
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 
 from database import SessionLocal, PdfCertificateDB, InventoryItemDB, UserDB
-from auth import get_current_user, extract_token
+from auth import verify_token
+from fastapi import status
 
 router = APIRouter(prefix="/api/v1", tags=["desperdicio"])
+
+
+def extract_token(authorization: Optional[str] = Header(None)) -> Optional[str]:
+    """Extract JWT token from Authorization header (Bearer scheme).
+
+    Local copy of the helper in main.py to keep this module self-contained.
+    """
+    if not authorization:
+        return None
+    parts = authorization.split()
+    if len(parts) == 2 and parts[0].lower() == "bearer":
+        return parts[1]
+    return None
+
+
+def get_current_user(token: Optional[str], db: Session) -> UserDB:
+    """Sync version of auth.get_current_user.
+
+    auth.get_current_user is async but its body has no awaits, so we just
+    re-implement it sync to avoid having to make every endpoint async.
+    """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    if not token:
+        raise credentials_exception
+    try:
+        token_data = verify_token(token)
+    except HTTPException:
+        raise credentials_exception
+
+    user = db.query(UserDB).filter(UserDB.email == token_data.email).first()
+    if user is None:
+        raise credentials_exception
+    return user
 
 
 def get_db():
