@@ -32,8 +32,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 
-from database import SessionLocal, PdfCertificateDB, InventoryItemDB, UserDB, NotificationChannelDB
-from auth import verify_token
+from database import SessionLocal, PdfCertificateDB, InventoryItemDB, UserDB, NotificationChannelDB, MagicLinkTokenDB
+from auth import verify_token, create_access_token
 from fastapi import status
 
 router = APIRouter(prefix="/api/v1", tags=["desperdicio"])
@@ -433,6 +433,26 @@ def generate_certificate(payload: CertificateCreate, db: Session = Depends(get_d
             }
             item.status = new_status_map.get(payload.destino, "retirado")
             db.commit()
+
+    # Email automático post-generación (Sprint 4) — best effort, no bloquea
+    try:
+        from desperdicio_email import send_certificate_email
+        pdf_link = pdf_url or f"{base_url}/api/v1/certificate/{hash_sha256}/pdf"
+        send_certificate_email(
+            user_email=payload.user_email,
+            business_name=payload.business_name,
+            producto=payload.producto,
+            cantidad=payload.cantidad,
+            unidad=payload.unidad,
+            destino_legible=_destino_legible(payload.destino),
+            fecha_evento_str=payload.fecha_evento.strftime("%d/%m/%Y %H:%M"),
+            pdf_url=pdf_link,
+            verify_url=verify_url,
+            hash_sha256=hash_sha256,
+        )
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("[desperdicio] email auto fail: %s", e)
 
     return CertificateResponse(
         id=row.id,
@@ -868,3 +888,93 @@ def telegram_webhook(payload: dict, db: Session = Depends(get_db)):
             send_telegram(str(chat_id), "❌ Token no válido. Vuelve a desperdicio.es y prueba de nuevo.")
 
     return {"ok": True}
+
+
+# ============================================================================
+# Magic-link auth (Sprint 5) — sin password
+# ============================================================================
+
+class MagicLinkRequest(BaseModel):
+    user_email: EmailStr
+
+
+class MagicLinkVerifyResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user_email: str
+
+
+@router.post("/auth/magic-link/request", status_code=202)
+def request_magic_link(payload: MagicLinkRequest, db: Session = Depends(get_db)):
+    """Pide un magic link de acceso. Genera token + envía email."""
+    import secrets
+    magic_token = secrets.token_urlsafe(48)
+    expires_at = datetime.utcnow() + timedelta(minutes=15)
+
+    row = MagicLinkTokenDB(
+        user_email=payload.user_email,
+        token=magic_token,
+        expires_at=expires_at,
+    )
+    db.add(row)
+    db.commit()
+
+    base_url = os.getenv("PUBLIC_BASE_URL", "https://desperdicio.es")
+    magic_link = f"{base_url}/auth.html?token={magic_token}"
+
+    try:
+        from desperdicio_email import send_magic_link_email
+        send_magic_link_email(payload.user_email, magic_link)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("[magic-link] email fail: %s", e)
+
+    return {"sent": True, "expires_in_seconds": 900}
+
+
+@router.get("/auth/magic-link/verify", response_model=MagicLinkVerifyResponse)
+def verify_magic_link(token: str = Query(..., min_length=20), db: Session = Depends(get_db)):
+    """Valida el token del magic link y devuelve JWT."""
+    row = db.query(MagicLinkTokenDB).filter_by(token=token).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Token inválido")
+    if row.used_at:
+        raise HTTPException(status_code=410, detail="Token ya usado")
+    if row.expires_at < datetime.utcnow():
+        raise HTTPException(status_code=410, detail="Token caducado")
+
+    row.used_at = datetime.utcnow()
+
+    user = db.query(UserDB).filter(UserDB.email == row.user_email).first()
+    if not user:
+        import secrets as _s
+        from auth import hash_password
+        user = UserDB(
+            email=row.user_email,
+            hashed_password=hash_password(_s.token_urlsafe(32)),
+            empresa_id=0,
+            nombre_empresa="desperdicio.es user",
+            rol="user",
+            is_active=True,
+        )
+        db.add(user)
+
+    db.commit()
+    db.refresh(user)
+
+    jwt_token = create_access_token(
+        data={"sub": user.email},
+        expires_delta=timedelta(days=45),
+    )
+    return MagicLinkVerifyResponse(access_token=jwt_token, user_email=user.email)
+
+
+@router.post("/auth/magic-link/cleanup")
+def cleanup_expired_tokens(db: Session = Depends(get_db)):
+    """Limpia tokens expirados (cron periodic)."""
+    cutoff = datetime.utcnow() - timedelta(days=7)
+    deleted = db.query(MagicLinkTokenDB).filter(
+        MagicLinkTokenDB.expires_at < cutoff
+    ).delete(synchronize_session=False)
+    db.commit()
+    return {"deleted": deleted}

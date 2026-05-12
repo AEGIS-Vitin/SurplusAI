@@ -289,6 +289,46 @@ class PdfCertificateDB(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 
+class MagicLinkTokenDB(Base):
+    """Tokens de magic-link para auth sin password.
+
+    Flujo: usuario pide login → backend genera token + envía email con
+    enlace https://desperdicio.es/auth?token=XXX → usuario clica → backend
+    valida token (no usado, no expirado) → crea sesión / JWT.
+    """
+    __tablename__ = "magic_link_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_email = Column(String(255), nullable=False, index=True)
+    token = Column(String(128), unique=True, nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    used_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class CustomerSubscriptionDB(Base):
+    """Suscripciones Stripe activas por cliente.
+
+    Producto desperdicio.es: cuando un cliente paga la suscripción (Solo €1.99 /
+    Pro €9.99 / Plus €19.99), Stripe nos manda webhook y guardamos aquí el
+    customer_id + subscription_id + tier vigente.
+    El status nos sirve para gating en endpoints (¿este email puede generar
+    ilimitados certificados? ¿tiene OCR?).
+    """
+    __tablename__ = "customer_subscriptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_email = Column(String(255), nullable=False, index=True, unique=True)
+    stripe_customer_id = Column(String(64), nullable=True, index=True)
+    stripe_subscription_id = Column(String(64), nullable=True, index=True)
+    tier = Column(String(32), default="free", nullable=False, index=True)  # free | solo | pro | plus
+    status = Column(String(32), default="inactive", nullable=False)  # active | past_due | canceled | trialing | inactive
+    current_period_end = Column(DateTime, nullable=True)
+    cancel_at_period_end = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class NotificationChannelDB(Base):
     """Canales de notificación por usuario (web push + Telegram + email).
 

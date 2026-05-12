@@ -26,6 +26,9 @@ import carbon
 import auth
 import notifications
 import desperdicio
+import desperdicio_stripe
+import desperdicio_ocr
+import desperdicio_bulk
 
 
 # ---- TRESAAA Surplus pricing constants (P0.2 — see VERDICT_BUSINESS_MODEL.md) ----
@@ -126,6 +129,9 @@ if os.getenv("TESTING", "false").lower() != "true":
 # Mount the desperdicio.es product router (PDF certificates + inventory).
 # Lives under /api/v1/* — disjoint from the legacy marketplace routes above.
 app.include_router(desperdicio.router)
+app.include_router(desperdicio_stripe.router)
+app.include_router(desperdicio_ocr.router)
+app.include_router(desperdicio_bulk.router)
 
 
 # Dependency for database session
