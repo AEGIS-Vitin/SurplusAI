@@ -261,6 +261,64 @@ class WaitlistEntryDB(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 
+class PdfCertificateDB(Base):
+    """Certificados PDF de trazabilidad — producto desperdicio.es €1.99/mes.
+
+    Cada fila representa un certificado generado por un usuario para documentar
+    qué hizo con un producto alimentario (donación, compost, alimentación animal, etc.).
+    El PDF contiene hash SHA-256 + QR de verificación pública que apunta a /verify/{hash}.
+    """
+    __tablename__ = "pdf_certificates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)  # nullable para tier Free sin auth
+    user_email = Column(String(255), nullable=False, index=True)
+    business_name = Column(String(255), nullable=False)
+    nif = Column(String(32), nullable=True)
+    fecha_evento = Column(DateTime, nullable=False)
+    producto = Column(String(500), nullable=False)
+    cantidad = Column(Float, nullable=False)
+    unidad = Column(String(32), default="kg", nullable=False)  # kg, unidades, litros
+    destino = Column(String(64), nullable=False)  # outcome: food_bank, donated_ong, cattle_feed, compost, energy_biogas
+    destino_detalle = Column(String(255), nullable=True)  # ej. "Banco Alimentos Valencia"
+    foto_url = Column(String(500), nullable=True)
+    pdf_url = Column(String(500), nullable=True)
+    hash_sha256 = Column(String(64), unique=True, nullable=False, index=True)
+    inventory_item_id = Column(Integer, ForeignKey("inventory_items.id"), nullable=True, index=True)  # link si vino de inventario
+    plan = Column(String(32), default="free", nullable=False)  # free, solo, pro, plus
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class InventoryItemDB(Base):
+    """Inventario de productos del cliente con fechas de caducidad.
+
+    Producto desperdicio.es: el cliente añade lo que compra → recibe alertas
+    cuando se acerca la caducidad → puede generar certificado de gestión final.
+    En Phase 2, FactuLens lo pre-llena automáticamente desde OCR factura proveedor.
+    """
+    __tablename__ = "inventory_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    nombre = Column(String(255), nullable=False)
+    categoria = Column(String(64), nullable=True)  # frutas, verduras, lacteos, carnes, panaderia, otros
+    cantidad = Column(Float, nullable=False)
+    unidad = Column(String(32), default="kg", nullable=False)
+    fecha_compra = Column(DateTime, nullable=True)
+    fecha_caducidad = Column(DateTime, nullable=False, index=True)
+    lote = Column(String(64), nullable=True)
+    proveedor = Column(String(255), nullable=True)
+    proveedor_nif = Column(String(32), nullable=True)
+    precio_unitario = Column(Float, nullable=True)  # para histórico precios cross-vertical FactuLens
+    foto_url = Column(String(500), nullable=True)
+    status = Column(String(32), default="vigente", nullable=False, index=True)  # vigente, consumido, donado, caducado, retirado
+    notas = Column(Text, nullable=True)
+    source = Column(String(32), default="manual", nullable=False)  # manual, factulens_ocr, api
+    factura_id = Column(Integer, nullable=True)  # referencia futura a FactuLens invoice_id
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 def _ensure_transacciones_columns():
     """Idempotent ALTER TABLE to add the P0.2/P0.3 revenue-split columns.
 
@@ -347,7 +405,7 @@ def seed_subscription_plans():
                 "feature_api_write": True,
                 "feature_account_manager": True,
                 "sla": "99.9% uptime, 4h response, gestor de cuenta dedicado",
-                "target": "Mercadona / Carrefour / grupos hospitalarios / catering industrial",
+                "target": "Cadenas de retail, grupos hospitalarios, catering industrial",
                 "negotiable_surcharges": "Por volumen, ESG reporting custom, integración ERP/SAP",
             },
         },

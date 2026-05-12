@@ -2,13 +2,15 @@ fastapi==0.104.1
 uvicorn==0.24.0
 gunicorn==21.2.0
 sqlalchemy==2.0.23
+alembic==1.13.1
 psycopg2-binary==2.9.9
 asyncpg==0.29.0
-# geoalchemy2==0.14.1  # Disabled: Railway postgres doesn't have PostGIS
+# geoalchemy2 is optional — install only if you enable PostGIS
+# (set USE_POSTGIS=true and run `CREATE EXTENSION postgis;` on your DB)
+# geoalchemy2==0.14.1
 pydantic[email]==2.5.0
 python-dotenv==1.0.0
 httpx==0.25.2
-redis==5.0.1
 geopy==2.4.0
 python-multipart==0.0.6
 python-jose[cryptography]==3.3.0
@@ -16,3 +18,6 @@ passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
 pytest==7.4.3
 pytest-asyncio==0.21.1
+# desperdicio.es product (PDF certificates + inventory)
+reportlab==4.0.7
+boto3==1.34.0
