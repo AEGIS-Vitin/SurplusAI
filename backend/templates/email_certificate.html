@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tu certificado de trazabilidad — {{ business_name }}</title>
+<style>
+  body { margin:0; padding:0; background:#FFF8F0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; color:#1A1814; }
+  .container { max-width:560px; margin:0 auto; padding:30px 20px; }
+  .card { background:#FFFFFF; border-radius:16px; padding:36px 30px; border:1px solid #D9D2C9; }
+  .brand { font-size:26px; font-weight:800; color:#E76F51; letter-spacing:-.5px; }
+  .brand-dot { color:#2A9D8F; }
+  h1 { font-size:26px; line-height:1.2; margin:24px 0 12px; font-weight:800; }
+  p { line-height:1.6; color:#5C5751; font-size:15px; margin:0 0 14px; }
+  .data-table { width:100%; border-collapse:collapse; margin:20px 0; }
+  .data-table td { padding:10px 12px; border-bottom:1px solid #F1EDE7; font-size:14px; }
+  .data-table td:first-child { color:#5C5751; font-weight:600; width:40%; }
+  .data-table td:last-child { color:#1A1814; text-align:right; }
+  .cta { display:inline-block; padding:14px 28px; background:#E76F51; color:#FFFFFF !important; text-decoration:none; border-radius:100px; font-weight:700; font-size:15px; margin:18px 0; }
+  .cta-secondary { display:inline-block; padding:12px 22px; background:transparent; color:#2A9D8F !important; text-decoration:none; border:2px solid #2A9D8F; border-radius:100px; font-weight:600; font-size:14px; margin:0 6px 8px 0; }
+  .info-box { background:#F1EDE7; padding:18px 22px; border-radius:12px; margin:22px 0; font-size:13px; color:#5C5751; line-height:1.55; }
+  .hash { font-family:Courier,monospace; font-size:11px; color:#888; word-break:break-all; }
+  .footer { text-align:center; font-size:12px; color:#888; margin-top:30px; }
+  .footer a { color:#E76F51; text-decoration:none; }
+  @media (max-width:480px) {
+    .card { padding:24px 20px; }
+    h1 { font-size:22px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="brand">desperdicio<span class="brand-dot">.</span>es</div>
+
+  <div class="card">
+    <h1>Tu certificado esta listo</h1>
+    <p>Hemos generado el certificado de trazabilidad para <strong>{{ business_name }}</strong>. Guardatelo para tu Hacienda, tu seguro y tus clientes B2B.</p>
+
+    <table class="data-table">
+      <tr><td>Producto</td><td>{{ producto }}</td></tr>
+      <tr><td>Cantidad</td><td>{{ cantidad }} {{ unidad }}</td></tr>
+      <tr><td>Destino</td><td>{{ destino_legible }}</td></tr>
+      <tr><td>Fecha</td><td>{{ fecha_evento }}</td></tr>
+    </table>
+
+    <div style="text-align:center;">
+      <a href="{{ pdf_url }}" class="cta">Descargar PDF</a>
+    </div>
+
+    <div style="text-align:center;margin:14px 0">
+      <a href="{{ verify_url }}" class="cta-secondary">Verificacion publica</a>
+    </div>
+
+    <div class="info-box">
+      <strong>Te ha gustado?</strong> Con el plan Solo a <strong>1,99 EUR/mes</strong> tienes certificados ilimitados + inventario con alertas de caducidad.<br>
+      <a href="https://desperdicio.es/#empezar" style="color:#E76F51;font-weight:600">Pasarme a Solo</a>
+    </div>
+
+    <p style="font-size:12px; color:#888; margin-top:24px;">
+      <strong>Hash de integridad SHA-256:</strong><br>
+      <span class="hash">{{ hash_sha256 }}</span>
+    </p>
+  </div>
+
+  <div class="footer">
+    desperdicio.es es un servicio de <a href="https://tresaaa.com">TRESAAA</a> · Plataforma de trazabilidad alimentaria.<br>
+    Quieres dejar de recibir estos emails? <a href="mailto:info@tresaaa.com?subject=Baja%20desperdicio.es">Cancelar</a>
+  </div>
+</div>
+</body>
+</html>
