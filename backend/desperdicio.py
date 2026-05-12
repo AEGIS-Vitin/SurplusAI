@@ -32,7 +32,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 
-from database import SessionLocal, PdfCertificateDB, InventoryItemDB, UserDB
+from database import SessionLocal, PdfCertificateDB, InventoryItemDB, UserDB, NotificationChannelDB
 from auth import verify_token
 from fastapi import status
 
@@ -640,3 +640,231 @@ def list_expiring_items(
 @router.get("/desperdicio/health")
 def health():
     return {"status": "ok", "service": "desperdicio.es", "version": "1.0"}
+
+
+# ============================================================================
+# Notification channels (Sprint 2)
+# ============================================================================
+
+class WebPushSubscriptionPayload(BaseModel):
+    user_email: EmailStr
+    endpoint: str
+    p256dh: str
+    auth: str
+
+
+class TelegramLinkPayload(BaseModel):
+    user_email: EmailStr
+    chat_id: str
+
+
+class NotificationChannelResponse(BaseModel):
+    id: int
+    channel_type: str
+    enabled: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+@router.post("/push/subscribe", response_model=NotificationChannelResponse, status_code=201)
+def push_subscribe(payload: WebPushSubscriptionPayload, db: Session = Depends(get_db)):
+    """Guarda la PushSubscription que generó el navegador del cliente.
+
+    El frontend manda esto justo después de aceptar el permiso de notificaciones.
+    """
+    user = db.query(UserDB).filter(UserDB.email == payload.user_email).first()
+    user_id = user.id if user else None
+
+    # Idempotencia: si ya hay subscription con mismo endpoint, devolvemos esa
+    existing = db.query(NotificationChannelDB).filter(
+        NotificationChannelDB.user_email == payload.user_email,
+        NotificationChannelDB.channel_type == "web_push",
+    ).all()
+    for ex in existing:
+        if (ex.payload or {}).get("endpoint") == payload.endpoint:
+            ex.enabled = True
+            db.commit()
+            return NotificationChannelResponse(
+                id=ex.id, channel_type=ex.channel_type, enabled=ex.enabled, created_at=ex.created_at,
+            )
+
+    sub_dict = {
+        "endpoint": payload.endpoint,
+        "keys": {"p256dh": payload.p256dh, "auth": payload.auth},
+    }
+    row = NotificationChannelDB(
+        user_id=user_id,
+        user_email=payload.user_email,
+        channel_type="web_push",
+        payload=sub_dict,
+        enabled=True,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return NotificationChannelResponse(
+        id=row.id, channel_type=row.channel_type, enabled=row.enabled, created_at=row.created_at,
+    )
+
+
+@router.post("/telegram/link", response_model=NotificationChannelResponse, status_code=201)
+def telegram_link(payload: TelegramLinkPayload, db: Session = Depends(get_db)):
+    """Vincula un chat_id de Telegram a un email de usuario.
+
+    El cliente abre el bot @Vitinceo_bot, escribe /start, el bot le devuelve un
+    enlace mágico tipo desperdicio.es/vincular?chat_id=XXX que pre-rellena este endpoint.
+    """
+    user = db.query(UserDB).filter(UserDB.email == payload.user_email).first()
+    user_id = user.id if user else None
+
+    existing = db.query(NotificationChannelDB).filter(
+        NotificationChannelDB.user_email == payload.user_email,
+        NotificationChannelDB.channel_type == "telegram",
+    ).first()
+    if existing:
+        existing.payload = {"chat_id": payload.chat_id}
+        existing.enabled = True
+        db.commit()
+        return NotificationChannelResponse(
+            id=existing.id, channel_type=existing.channel_type,
+            enabled=existing.enabled, created_at=existing.created_at,
+        )
+
+    row = NotificationChannelDB(
+        user_id=user_id,
+        user_email=payload.user_email,
+        channel_type="telegram",
+        payload={"chat_id": payload.chat_id},
+        enabled=True,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return NotificationChannelResponse(
+        id=row.id, channel_type=row.channel_type, enabled=row.enabled, created_at=row.created_at,
+    )
+
+
+@router.delete("/notifications/{channel_id}", status_code=204)
+def disable_channel(channel_id: int, user_email: str = Query(...), db: Session = Depends(get_db)):
+    """Desactiva un canal (no lo borra para no perder el endpoint si re-suscribe)."""
+    ch = db.query(NotificationChannelDB).filter(
+        NotificationChannelDB.id == channel_id,
+        NotificationChannelDB.user_email == user_email,
+    ).first()
+    if not ch:
+        raise HTTPException(status_code=404, detail="Canal no encontrado")
+    ch.enabled = False
+    db.commit()
+    return None
+
+
+@router.get("/push/public-key")
+def push_public_key():
+    """Devuelve la VAPID public key para que el frontend pueda llamar a
+    PushManager.subscribe({applicationServerKey: ...}).
+    """
+    return {"vapid_public_key": os.getenv("VAPID_PUBLIC_KEY", "")}
+
+
+@router.post("/notifications/check-expiring")
+def check_expiring_and_notify(user_email: EmailStr, days_ahead: int = 3, db: Session = Depends(get_db)):
+    """Comprueba items próximos a caducar y dispara notificación multi-canal.
+
+    Útil para llamarlo desde el frontend al cargar la app (sin cron server-side).
+    En producción habrá también un job que recorre todos los users.
+    """
+    user = db.query(UserDB).filter(UserDB.email == user_email).first()
+    if not user:
+        return {"items_found": 0, "notifications_sent": {}}
+
+    cutoff = datetime.utcnow() + timedelta(days=days_ahead)
+    items = (
+        db.query(InventoryItemDB)
+        .filter(
+            InventoryItemDB.user_id == user.id,
+            InventoryItemDB.status == "vigente",
+            InventoryItemDB.fecha_caducidad <= cutoff,
+        )
+        .order_by(InventoryItemDB.fecha_caducidad.asc())
+        .limit(10)
+        .all()
+    )
+
+    if not items:
+        return {"items_found": 0, "notifications_sent": {}}
+
+    # Mensaje compacto con los próximos a caducar
+    lines = []
+    for it in items[:5]:
+        delta = (it.fecha_caducidad - datetime.utcnow()).days
+        when = "hoy" if delta == 0 else (f"en {delta} días" if delta > 0 else f"caducó hace {-delta} días")
+        lines.append(f"• {it.nombre} ({it.cantidad:g} {it.unidad}) — {when}")
+
+    title = f"⚠️ {len(items)} producto(s) próximo(s) a caducar"
+    body = "\n".join(lines)
+    url = "https://desperdicio.es/#empezar"
+
+    from notifications_v2 import send_alert
+    results = send_alert(db, user_email, title=title, body=body, url=url)
+    return {"items_found": len(items), "notifications_sent": results}
+
+
+# ============================================================================
+# Telegram bot webhook (recibe /start de los clientes)
+# ============================================================================
+
+@router.post("/telegram/webhook")
+def telegram_webhook(payload: dict, db: Session = Depends(get_db)):
+    """Endpoint que recibe los updates del bot @Vitinceo_bot via webhook.
+
+    Acepta solo el comando /vincular {hash}, que el cliente lanza desde el bot.
+    El {hash} se le entrega en el flujo de registro de desperdicio.es y vincula
+    su chat_id al user_email correspondiente.
+    """
+    msg = payload.get("message", {})
+    text = (msg.get("text") or "").strip()
+    chat_id = (msg.get("chat") or {}).get("id")
+    if not chat_id or not text:
+        return {"ok": True}
+
+    # /start con parámetro (Telegram deep-link)
+    if text.startswith("/start") or text.startswith("/vincular"):
+        parts = text.split(maxsplit=1)
+        if len(parts) < 2:
+            from notifications_v2 import send_telegram
+            send_telegram(
+                str(chat_id),
+                "👋 Hola, soy el bot de desperdicio.es.\n\n"
+                "Para vincular tu cuenta:\n"
+                "1. Entra en desperdicio.es\n"
+                "2. Ve a tu perfil → Notificaciones\n"
+                "3. Pulsa 'Conectar Telegram'\n"
+                "4. Me llegará un código que pegas y ya estás listo."
+            )
+            return {"ok": True}
+
+        token = parts[1].strip()
+        # En esta versión inicial el token = email del cliente (debería ser un OTP)
+        if "@" in token:
+            row = NotificationChannelDB(
+                user_id=None,
+                user_email=token,
+                channel_type="telegram",
+                payload={"chat_id": str(chat_id)},
+                enabled=True,
+            )
+            db.add(row)
+            db.commit()
+            from notifications_v2 import send_telegram
+            send_telegram(
+                str(chat_id),
+                f"✅ Telegram vinculado a {token}.\n\nTe avisaré cuando tengas productos próximos a caducar."
+            )
+        else:
+            from notifications_v2 import send_telegram
+            send_telegram(str(chat_id), "❌ Token no válido. Vuelve a desperdicio.es y prueba de nuevo.")
+
+    return {"ok": True}

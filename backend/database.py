@@ -289,6 +289,25 @@ class PdfCertificateDB(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 
+class NotificationChannelDB(Base):
+    """Canales de notificación por usuario (web push + Telegram + email).
+
+    Un usuario puede tener varios canales activos. Cuando un item del inventario
+    se acerca a la fecha de caducidad, notifications_v2.send_alert() recorre
+    todos los canales del user y manda la alerta.
+    """
+    __tablename__ = "notification_channels"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    user_email = Column(String(255), nullable=False, index=True)
+    channel_type = Column(String(32), nullable=False, index=True)  # web_push | telegram | email
+    payload = Column(JSON, nullable=False)  # web_push: subscription dict; telegram: {chat_id}
+    enabled = Column(Boolean, default=True, nullable=False)
+    last_used_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
 class InventoryItemDB(Base):
     """Inventario de productos del cliente con fechas de caducidad.
 
