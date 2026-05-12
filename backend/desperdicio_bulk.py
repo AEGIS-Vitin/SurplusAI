@@ -304,6 +304,74 @@ def admin_recent_certs(
     ]
 
 
+@router.post("/cron/check-all-expiring")
+def cron_check_all_expiring(
+    days_ahead: int = Query(3, ge=1, le=30),
+    cron_secret: Optional[str] = Header(None, alias="X-Cron-Secret"),
+    db: Session = Depends(get_db),
+):
+    """Cron endpoint que recorre TODOS los users con inventario y dispara alertas
+    de productos próximos a caducar.
+
+    Disparable cada hora desde Railway cron / GitHub Actions / cualquier scheduler externo.
+    Auth simple via header X-Cron-Secret == ENV CRON_SECRET.
+    """
+    expected_secret = os.getenv("CRON_SECRET", "")
+    if expected_secret and cron_secret != expected_secret:
+        raise HTTPException(status_code=403, detail="Cron auth fail")
+
+    cutoff = datetime.utcnow() + timedelta(days=days_ahead)
+
+    # Agrupar items expiring por user
+    items = (
+        db.query(InventoryItemDB)
+        .filter(
+            InventoryItemDB.status == "vigente",
+            InventoryItemDB.fecha_caducidad <= cutoff,
+            InventoryItemDB.fecha_caducidad >= datetime.utcnow() - timedelta(days=1),
+        )
+        .order_by(InventoryItemDB.user_id, InventoryItemDB.fecha_caducidad.asc())
+        .all()
+    )
+
+    by_user = {}
+    for it in items:
+        by_user.setdefault(it.user_id, []).append(it)
+
+    notified_users = 0
+    total_items = len(items)
+    errors = []
+
+    from notifications_v2 import send_alert
+    for user_id, user_items in by_user.items():
+        try:
+            user = db.query(UserDB).filter(UserDB.id == user_id).first()
+            if not user:
+                continue
+
+            lines = []
+            for it in user_items[:5]:
+                delta = (it.fecha_caducidad - datetime.utcnow()).days
+                when = "hoy" if delta == 0 else (f"en {delta}d" if delta > 0 else f"caducó hace {-delta}d")
+                lines.append(f"• {it.nombre} ({it.cantidad:g} {it.unidad}) — {when}")
+
+            title = f"⚠️ {len(user_items)} productos por caducar"
+            body = "\n".join(lines)
+            url = "https://desperdicio.surplusai.es/dashboard.html"
+
+            send_alert(db, user.email, title=title, body=body, url=url)
+            notified_users += 1
+        except Exception as e:
+            errors.append({"user_id": user_id, "error": str(e)[:200]})
+
+    return {
+        "executed_at": datetime.utcnow().isoformat() + "Z",
+        "items_found": total_items,
+        "users_notified": notified_users,
+        "errors": errors[:10],
+    }
+
+
 @router.get("/admin/recent-subscriptions")
 def admin_recent_subscriptions(
     limit: int = Query(50, ge=1, le=500),

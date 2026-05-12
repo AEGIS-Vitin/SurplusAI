@@ -27,7 +27,7 @@ import os
 from datetime import datetime, timedelta
 from typing import Optional, List
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Header
+from fastapi import APIRouter, Depends, HTTPException, Query, Header, UploadFile, File
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
@@ -978,3 +978,70 @@ def cleanup_expired_tokens(db: Session = Depends(get_db)):
     ).delete(synchronize_session=False)
     db.commit()
     return {"deleted": deleted}
+
+
+# ============================================================================
+# A/B Testing tracking simple (Sprint 16)
+# ============================================================================
+
+class ABEventPayload(BaseModel):
+    variant: str = Field(..., max_length=32)  # control | b | c | etc
+    event: str = Field(..., max_length=64)    # impression | cta_click | signup | conversion
+    user_email: Optional[str] = None
+    extra: Optional[dict] = None
+
+
+@router.post("/ab/track")
+def ab_track(payload: ABEventPayload):
+    """Log simple de eventos A/B. Por ahora solo guarda en log; sin tabla.
+
+    En el futuro: tabla ab_events con cruce contra subscriptions para conversion rate real.
+    """
+    import logging
+    logging.getLogger("ab_track").info(
+        "ab=%s event=%s email=%s extra=%s",
+        payload.variant, payload.event, payload.user_email, payload.extra,
+    )
+    return {"tracked": True}
+
+
+# ============================================================================
+# Foto evidence (Sprint 18)
+# ============================================================================
+
+@router.post("/certificate/{hash_sha256}/photo")
+async def attach_photo_to_certificate(
+    hash_sha256: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """Adjunta foto al certificado existente. Útil para evidence ante auditoría."""
+    from fastapi import UploadFile, File  # noqa
+    row = db.query(PdfCertificateDB).filter_by(hash_sha256=hash_sha256).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Certificado no encontrado")
+
+    ct = (file.content_type or "").lower()
+    if ct not in {"image/jpeg", "image/jpg", "image/png", "image/webp"}:
+        raise HTTPException(status_code=400, detail="Solo JPEG/PNG/WEBP")
+
+    body = await file.read()
+    if len(body) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Foto >5MB")
+
+    # Subir a R2 si configurado
+    from desperdicio import _upload_to_storage
+    ext = ct.split("/")[-1]
+    filename = f"certificate-photos/{hash_sha256}.{ext}"
+    photo_url = _upload_to_storage(body, filename)
+
+    if not photo_url:
+        # Sin R2, devolvemos error explícito (no podemos servir inline para 5MB cada vez)
+        raise HTTPException(
+            status_code=503,
+            detail="Storage R2 no configurado. Configura R2_* env vars en servidor.",
+        )
+
+    row.foto_url = photo_url
+    db.commit()
+    return {"hash_sha256": hash_sha256, "foto_url": photo_url}
