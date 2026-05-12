@@ -372,6 +372,79 @@ def cron_check_all_expiring(
     }
 
 
+@router.get("/admin/cohorts")
+def admin_cohorts(_admin: bool = Depends(require_admin), db: Session = Depends(get_db)):
+    """Cohorts mensuales: signups por mes + retention semana 1, 2, 4, 8, 12.
+
+    Para análisis de churn / activation real.
+    """
+    now = datetime.utcnow()
+    cohorts = []
+
+    for m in range(0, 6):  # últimos 6 meses
+        month_start = (now - timedelta(days=30 * (m + 1))).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        month_end = (now - timedelta(days=30 * m)).replace(day=28, hour=23, minute=59, second=59)
+
+        signups = db.query(UserDB).filter(
+            and_(UserDB.created_at >= month_start, UserDB.created_at <= month_end)
+        ).all()
+
+        if not signups:
+            continue
+
+        signup_emails = [u.email for u in signups]
+
+        # Activation: usuarios que generaron al menos 1 cert en su primer mes
+        activated = (
+            db.query(PdfCertificateDB.user_email)
+            .filter(
+                PdfCertificateDB.user_email.in_(signup_emails),
+                PdfCertificateDB.created_at <= month_end + timedelta(days=30),
+            )
+            .distinct()
+            .count()
+        )
+
+        # Retention semana N: usuarios con cert en semana N tras signup
+        retentions = {}
+        for week in [1, 2, 4, 8, 12]:
+            cnt = 0
+            for u in signups:
+                week_start = u.created_at + timedelta(days=7 * (week - 1))
+                week_end = u.created_at + timedelta(days=7 * week)
+                has_activity = db.query(PdfCertificateDB).filter(
+                    PdfCertificateDB.user_email == u.email,
+                    PdfCertificateDB.created_at >= week_start,
+                    PdfCertificateDB.created_at <= week_end,
+                ).first()
+                if has_activity:
+                    cnt += 1
+            retentions[f"w{week}"] = cnt
+
+        # Conversión a paying customer
+        paying = db.query(CustomerSubscriptionDB).filter(
+            CustomerSubscriptionDB.user_email.in_(signup_emails),
+            CustomerSubscriptionDB.status == "active",
+            CustomerSubscriptionDB.tier != "free",
+        ).count()
+
+        cohorts.append({
+            "month": month_start.strftime("%Y-%m"),
+            "signups": len(signups),
+            "activated_first_month": activated,
+            "activation_rate_pct": round((activated / len(signups)) * 100, 1) if signups else 0,
+            "retention": retentions,
+            "paying_customers": paying,
+            "conversion_to_paid_pct": round((paying / len(signups)) * 100, 1) if signups else 0,
+        })
+
+    return {
+        "cohorts": cohorts,
+        "computed_at": now.isoformat() + "Z",
+        "note": "Activation = generó al menos 1 certificado en su primer mes. Retention = al menos 1 cert en la semana indicada tras signup.",
+    }
+
+
 @router.get("/admin/recent-subscriptions")
 def admin_recent_subscriptions(
     limit: int = Query(50, ge=1, le=500),
