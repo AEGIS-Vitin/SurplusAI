@@ -836,6 +836,27 @@ def check_expiring_and_notify(user_email: EmailStr, days_ahead: int = 3, db: Ses
 # Telegram bot webhook (recibe /start de los clientes)
 # ============================================================================
 
+def _telegram_send_with_keyboard(chat_id: str, text: str, keyboard: list):
+    """Envía mensaje Telegram con inline keyboard."""
+    import requests, os, json as _j
+    token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    if not token: return False
+    try:
+        r = requests.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            json={
+                "chat_id": chat_id,
+                "text": text,
+                "parse_mode": "HTML",
+                "reply_markup": {"inline_keyboard": keyboard},
+            },
+            timeout=8,
+        )
+        return r.status_code == 200
+    except Exception:
+        return False
+
+
 @router.post("/telegram/webhook")
 def telegram_webhook(payload: dict, db: Session = Depends(get_db)):
     """Endpoint que recibe los updates del bot @Vitinceo_bot via webhook.
