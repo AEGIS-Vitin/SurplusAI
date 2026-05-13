@@ -395,6 +395,69 @@ def api_info():
 
 CO2_KG_PER_KG_FOOD_AVOIDED = 2.5  # kg CO2eq por kg comida evitada (FAO promedio)
 
+COSTE_KG_POR_NEGOCIO = {
+    "restaurante":  4.20,
+    "hotel":        3.80,
+    "cafeteria":    3.10,
+    "comedor":      2.90,
+    "supermercado": 2.40,
+    "panaderia":    2.10,
+    "fruteria":     1.60,
+    "carniceria":   6.80,
+    "pescaderia":   7.20,
+    "industria":    1.80,
+    "otro":         3.00,
+}
+
+SANCION_BASE_LEY = 2001  # Ley 1/2025 art.18 — leve €2.001-€60.000
+
+
+class CalculatorPayload(BaseModel):
+    kg_mes: float = Field(..., gt=0, le=100000)
+    tipo_negocio: str = Field("otro")
+
+
+@router.post("/calculator/savings")
+def calculator_savings(payload: CalculatorPayload):
+    """Calculadora pública de ahorro económico + CO2 evitado.
+
+    Sin auth — pensada para landing desperdicio.es. Devuelve proyección anual.
+    """
+    tipo = (payload.tipo_negocio or "otro").lower().strip()
+    coste_kg = COSTE_KG_POR_NEGOCIO.get(tipo, COSTE_KG_POR_NEGOCIO["otro"])
+
+    kg_anual = payload.kg_mes * 12
+    co2_anual = kg_anual * CO2_KG_PER_KG_FOOD_AVOIDED
+    ahorro_directo = kg_anual * coste_kg
+    sancion_evitada = SANCION_BASE_LEY if kg_anual >= 1200 else 0
+
+    return {
+        "input": {
+            "kg_mes": payload.kg_mes,
+            "tipo_negocio": tipo,
+            "coste_kg_euros": coste_kg,
+        },
+        "proyeccion_anual": {
+            "kg_alimento_recuperable": round(kg_anual, 1),
+            "kg_co2eq_evitado": round(co2_anual, 1),
+            "ahorro_economico_eur": round(ahorro_directo, 2),
+            "sancion_ley_1_2025_evitada_eur": sancion_evitada,
+            "ahorro_total_eur": round(ahorro_directo + sancion_evitada, 2),
+        },
+        "equivalencias": {
+            "arboles_ano": round(co2_anual / 21, 1),
+            "km_coche_evitados": round(co2_anual * 5, 0),
+            "vuelos_madrid_barcelona": round(co2_anual / 230, 1),
+        },
+        "factores": {
+            "co2_kg_por_kg": CO2_KG_PER_KG_FOOD_AVOIDED,
+            "coste_kg_eur": coste_kg,
+            "fuente_co2": "FAO 2022 — promedio sector HORECA",
+            "fuente_coste": "MAPA 2023 + benchmarks ESHTA",
+            "fuente_sancion": "Ley 1/2025 art.18 (€2.001-€500.000)",
+        },
+    }
+
 
 @router.get("/carbon/me")
 def my_carbon_impact(user_email: EmailStr, db: Session = Depends(get_db)):
