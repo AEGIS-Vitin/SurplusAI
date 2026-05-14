@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#1e40af" />
+<title>Car Arbitrage Pro · Artefacto</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+  .num{font-variant-numeric:tabular-nums}
+  details>summary{list-style:none;cursor:pointer}
+  details>summary::-webkit-details-marker{display:none}
+  input[type=number]{-moz-appearance:textfield}
+  input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+</style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+<div id="root"></div>
+<script type="text/babel">
+"use strict";
+
+// ════════════════════════════════════════════════════════════════════
+//  CAR ARBITRAGE PRO — ARTEFACTO HTML PURO (todo cliente, sin backend)
+//  Para usar Telegram o scrapers, usa la versión Python en el repo.
+// ════════════════════════════════════════════════════════════════════
+
+const {useState, useEffect} = React;
+const TODAY_YEAR = new Date().getFullYear();
+
+// ──── helpers ────
+const fmtEur = (n) => n == null || isNaN(n) ? "—" :
+  new Intl.NumberFormat("es-ES",{style:"currency",currency:"EUR",maximumFractionDigits:0}).format(n);
+const fmtPct = (n) => n == null || isNaN(n) ? "—" : (n*100).toFixed(1) + "%";
+const round0 = (n) => n == null || isNaN(n) ? 0 : Math.round(n);
+
+// ──── FX ────
+const FX = {EUR:1, USD:0.92, AED:0.25, GBP:1.17, JPY:0.0061, CHF:1.04};
+function toEur(amount, currency, override) {
+  if (override && override !== 1) return amount * override;
+  return amount * (FX[currency.toUpperCase()] ?? 1);
+}
+
+// ──── IEDMT ────
+const DEPR = [[1,1.0],[2,0.84],[3,0.67],[4,0.56],[5,0.47],[6,0.39],[7,0.34],[8,0.28],[9,0.24],[10,0.19],[11,0.17],[12,0.13]];
+function depreciationCoef(age) {
+  for (const [c, d] of DEPR) if (age < c) return d;
+  return 0.10;
+}
+function iedmtRate(co2, canary) {
+  if (co2 == null) co2 = 200;
+  if (canary) {
+    if (co2 < 120) return 0; if (co2 < 160) return 0.0375;
+    if (co2 < 200) return 0.0875; return 0.1375;
+  }
+  if (co2 < 120) return 0; if (co2 < 160) return 0.0475;
+  if (co2 < 200) return 0.0975; return 0.1475;
+}
+function computeIedmt(v, fiscalValueNew, opts={}) {
+  const notes = [];
+  if (opts.ceutaMelilla) return {rate:0, base:0, tax:0, exemption:"Ceuta/Melilla exento", notes};
+  if (opts.disability) return {rate:0, base:0, tax:0, exemption:"Discapacidad ≥33%", notes};
+  const age = TODAY_YEAR - v.year;
+  if (opts.historic && age >= 30) return {rate:0, base:0, tax:0, exemption:"Histórico >30 años", notes};
+  if (v.fuel === "bev") return {rate:0, base:0, tax:0, exemption:"BEV (eléctrico) tipo 0%", notes};
+  let co2 = v.co2_wltp;
+  if (co2 == null && v.co2_nedc) co2 = v.co2_nedc * 1.21;
+  if (co2 == null) notes.push("Sin CO2: asume 200 g/km (tipo máximo).");
+  const rate = iedmtRate(co2, opts.canary);
+  const coef = depreciationCoef(age);
+  const base = fiscalValueNew * coef;
+  notes.push(`Coef depreciación ${age} años: ${coef.toFixed(2)}`);
+  let tax = base * rate;
+  if (opts.largeFamily) { tax *= 0.5; notes.push("Bonificación 50% familia numerosa."); }
+  return {rate, base, tax, exemption:null, notes};
+}
+
+// ──── IVA / REBU ────
+const VAT_ES = 0.21;
+function rebuVat(sale, totalCostVatIncl) {
+  const margin = Math.max(0, sale - totalCostVatIncl);
+  const vat = margin * (VAT_ES / (1 + VAT_ES));
+  return {regime:"REBU", vatCharged:vat, vatDeductible:0, netVatToPay:vat,
+    notes:[`Base IVA (margen): ${margin.toFixed(2)} €`,
+           "Factura SIN IVA al cliente (art. 135 Ley 37/1992).",
+           "IVA soportado en gastos NO deducible."]};
+}
+function generalVat(saleNet, deductible) {
+  const vatOut = saleNet * VAT_ES;
+  return {regime:"General", vatCharged:vatOut, vatDeductible:deductible,
+    netVatToPay:vatOut - deductible,
+    notes:[`IVA repercutido (21%): ${vatOut.toFixed(2)} €`,
+           `IVA soportado deducible: ${deductible.toFixed(2)} €`]};
+}
+
+// ──── Aduanas extra-UE ────
+function computeCustoms(purchase, freight, insurance, opts={}) {
+  const cif = purchase + freight + insurance;
+  const dutyRate = opts.historic ? 0 : 0.10;
+  const duty = cif * dutyRate;
+  const vatRate = opts.canary ? 0.07 : 0.21;
+  const vat = (cif + duty) * vatRate;
+  const dua = 380, inspection = 220 * 0.15;
+  const notes = [
+    `CIF: ${cif.toFixed(0)} €`,
+    `Arancel TARIC ${(dutyRate*100).toFixed(1)}%: ${duty.toFixed(0)} €`,
+    `${opts.canary?"IGIC":"IVA importación"} ${(vatRate*100).toFixed(0)}%: ${vat.toFixed(0)} €`,
+    `DUA: ${dua} €`, `Inspección esperada: ${inspection.toFixed(0)} €`,
+  ];
+  if (opts.historic) notes.push("Vehículo histórico: arancel 0%.");
+  return {cif, duty, vat, dua, inspection, total:duty+vat+dua+inspection, notes};
+}
+
+// ──── Transporte ────
+const EU_TRUCK = {DE:[600,900], FR:[400,650], IT:[500,800], NL:[700,950], BE:[700,950],
+  PL:[850,1100], AT:[700,950], PT:[250,400], SE:[1100,1500], DK:[900,1200],
+  CZ:[800,1050], CH:[700,950]};
+const EXTRA_EU = {AE:{roro:[1500,2500], container:[3000,4500], transit:23},
+  JP:{roro:[1800,2800], container:[3500,5500], transit:42},
+  US:{roro:[1300,2200], container:[2800,4200], transit:24},
+  GB:{roro:[500,800], container:[1500,2400], transit:5}};
+function estimateEuTruck(origin) {
+  const r = EU_TRUCK[origin] || [700, 950];
+  return {mode:`UE camión (${origin})`, cost:(r[0]+r[1])/2, transitDays:4, notes:[]};
+}
+function estimateExtraEu(origin, container, declaredValue, fxUsdEur=0.92) {
+  const cfg = EXTRA_EU[origin];
+  if (!cfg) return {mode:"extra-UE genérico", cost:2500, transitDays:25,
+    notes:[`Origen ${origin} no parametrizado`]};
+  const rng = container ? cfg.container : cfg.roro;
+  const usd = (rng[0]+rng[1])/2;
+  const shipping = usd * fxUsdEur;
+  const insurance = declaredValue * 0.015;
+  const portFees = 475;
+  return {mode:container?"contenedor":"RoRo", cost:shipping+insurance+portFees,
+    transitDays:cfg.transit,
+    notes:[`USD ${usd.toFixed(0)} × ${fxUsdEur}`,
+           `Seguro 1.5%: ${insurance.toFixed(0)} €`,
+           `Tasas portuarias: ${portFees} €`]};
+}
+
+// ──── Homologación ────
+const EU_COUNTRIES = new Set(["AT","BE","BG","HR","CY","CZ","DK","EE","FI","FR","DE","GR",
+  "HU","IE","IT","LV","LT","LU","MT","NL","PL","PT","RO","SK","SI","ES","SE"]);
+function estimateHomologation(origin, hasCoc, declaredValue, isPremium, isUs) {
+  const breakdown = {tasa_trafico_9050:99.77, gestoria:350, placas:25};
+  const notes = [];
+  let risk = 0;
+  if (EU_COUNTRIES.has(origin)) {
+    breakdown.itv_ficha_reducida = 150;
+    if (!hasCoc) { breakdown.coc_request = 200; notes.push("Sin COC: pedir al fabricante 50-300€."); }
+  } else {
+    breakdown.homologacion_individual = isPremium ? 2500 : 1500;
+    breakdown.itv_ficha_completa = 250;
+    breakdown.adaptaciones = isUs ? 1500 : 500;
+    notes.push(isUs ? "Spec USA: faros DOT→E, intermitentes ámbar, velocímetro km/h."
+                    : "Spec GCC/AE: marcado E faros, antiniebla trasera.");
+    risk = declaredValue * 0.15;
+    notes.push(`Provisión riesgo homologación: ${risk.toFixed(0)} €. Verificar Euro 6d.`);
+  }
+  const total = Object.values(breakdown).reduce((a,b)=>a+b,0);
+  return {total, breakdown, riskProvision:risk, notes};
+}
+
+// ──── Reacondicionado ────
+function estimateReconditioning(v, isPremium, cosmetic="average") {
+  const notes = [];
+  const bd = {};
+  const age = TODAY_YEAR - v.year;
+  let mech = v.km < 60000 ? 220 : v.km < 120000 ? 600 : 1300;
+  if (isPremium && v.km > 100000) { mech += 1000; notes.push("Premium >100k: cadenas/EGR/turbos."); }
+  bd.mecanica_preventiva = mech;
+  if (v.fuel === "diesel" && v.km > 150000) { bd.dpf_adblue = 800; notes.push("Diesel >150k: DPF/AdBlue."); }
+  if (v.fuel === "hev" || v.fuel === "phev") bd.test_bateria_traccion = 100;
+  bd.neumaticos = age > 4 ? 450 : 0;
+  bd.frenos = 320;
+  bd.distribucion = v.km > 110000 ? 600 : 0;
+  bd.estetica = ({good:200, average:500, poor:950})[cosmetic] ?? 500;
+  bd.documentacion_llaves = 80;
+  const sub = Object.values(bd).reduce((a,b)=>a+b,0);
+  bd.buffer_imprevistos_15pct = sub * 0.15;
+  return {total:sub*1.15, breakdown:bd, notes};
+}
+
+// ──── Pricer (OLS 3x3 manual) ────
+function percentile(arr, p) {
+  if (!arr.length) return 0;
+  const s = [...arr].sort((a,b)=>a-b);
+  const idx = (p/100)*(s.length-1);
+  const lo = Math.floor(idx), hi = Math.ceil(idx);
+  if (lo === hi) return s[lo];
+  return s[lo]*(hi-idx) + s[hi]*(idx-lo);
+}
+const meanA = (a) => a.reduce((s,x)=>s+x,0)/a.length;
+const stdA = (a) => { const m = meanA(a); return Math.sqrt(a.reduce((s,x)=>s+(x-m)**2,0)/a.length); };
+function solve3x3(A, b) {
+  const M = A.map((r,i)=>[...r, b[i]]);
+  for (let i=0; i<3; i++) {
+    let max = i;
+    for (let j=i+1; j<3; j++) if (Math.abs(M[j][i]) > Math.abs(M[max][i])) max = j;
+    [M[i], M[max]] = [M[max], M[i]];
+    if (Math.abs(M[i][i]) < 1e-12) return null;
+    for (let j=i+1; j<3; j++) {
+      const f = M[j][i] / M[i][i];
+      for (let k=i; k<4; k++) M[j][k] -= f * M[i][k];
+    }
+  }
+  const x = [0,0,0];
+  for (let i=2; i>=0; i--) {
+    let s = M[i][3];
+    for (let j=i+1; j<3; j++) s -= M[i][j] * x[j];
+    x[i] = s / M[i][i];
+  }
+  return x;
+}
+function marketStats(comps, target, market, minN=5) {
+  const sample = comps.filter(c => c.market === market && !c.accident && c.price_eur > 0 && c.km >= 0);
+  if (sample.length < minN) return null;
+  const prices = sample.map(c => Number(c.price_eur));
+  const kms = sample.map(c => Number(c.km));
+  const years = sample.map(c => Number(c.year));
+  const p25 = percentile(prices, 25), p50 = percentile(prices, 50), p75 = percentile(prices, 75);
+  const notes = [];
+  let fair = p50;
+  if (sample.length >= 6) {
+    const n = sample.length;
+    const sk = kms.reduce((s,x)=>s+x, 0);
+    const sy = years.reduce((s,x)=>s+x, 0);
+    const skk = kms.reduce((s,x)=>s+x*x, 0);
+    const syy = years.reduce((s,x)=>s+x*x, 0);
+    const sky = kms.reduce((s,x,i)=>s+x*years[i], 0);
+    const skp = kms.reduce((s,x,i)=>s+x*prices[i], 0);
+    const syp = years.reduce((s,x,i)=>s+x*prices[i], 0);
+    const sp = prices.reduce((s,x)=>s+x, 0);
+    const A = [[skk, sky, sk],[sky, syy, sy],[sk, sy, n]];
+    const b = [skp, syp, sp];
+    const beta = solve3x3(A, b);
+    if (beta) {
+      fair = beta[0]*target.km + beta[1]*target.year + beta[2];
+      fair = Math.max(p25*0.85, Math.min(p75*1.15, fair));
+      notes.push("Fair price ajustado por OLS (km, año).");
+    }
+  } else {
+    notes.push("n<6: fair = mediana.");
+  }
+  return {market, n:sample.length, p25, p50, p75, mean:meanA(prices), std:stdA(prices), fair, notes};
+}
+
+// ──── Rotación ────
+const SEGMENT_DAYS = {premium_german:35, premium_german_high:55, premium_other:45,
+  exotic:90, suv_large:50, suv_compact:30, compact_mainstream:25, sedan_mainstream:35,
+  city:22, ev_premium:50, ev_compact:45, phev:55, mpv_van:45, pickup:40,
+  youngtimer:75, classic:120};
+const PREMIUM_GERMAN = new Set(["bmw","mercedes","mercedes-benz","audi"]);
+const PREMIUM_OTHER = new Set(["volvo","lexus","jaguar","land rover","range rover","infiniti","acura","genesis"]);
+const EXOTIC = new Set(["porsche","maserati","ferrari","lamborghini","aston martin","bentley","rolls-royce","mclaren"]);
+const PICKUP_M = ["hilux","ranger","l200","amarok","navara","d-max","frontier"];
+const SUV_L = ["x5","x6","x7","q7","q8","gle","gls","cayenne","rx","lx","land cruiser","patrol","range rover","discovery","touareg"];
+const SUV_C = ["tiguan","tucson","sportage","qashqai","kuga","cr-v","rav4","ateca","kadjar","captur","hr-v","yaris cross","x1","x3","q3","q5"];
+const CITY_M = ["polo","ibiza","yaris","corsa","208","clio","fiesta","i10","i20","fabia","panda","up!","fox","twingo","aygo","c1","108"];
+const COMPACT_M = ["golf","focus","astra","megane","civic","leon","i30","mazda3","auris","corolla","308","1 series","a3","a-class"];
+const has = (txt, words) => words.some(w => txt.includes(w));
+
+function classifySegment(v) {
+  const make = v.make.toLowerCase().trim();
+  const full = `${v.model} ${v.version || ""}`.toLowerCase();
+  const age = TODAY_YEAR - v.year;
+  if (age >= 25) return "classic";
+  if (age >= 15) return "youngtimer";
+  if (v.fuel === "bev") {
+    if (PREMIUM_GERMAN.has(make) || PREMIUM_OTHER.has(make) || EXOTIC.has(make) || make === "tesla") return "ev_premium";
+    return "ev_compact";
+  }
+  if (v.fuel === "phev") return "phev";
+  if (EXOTIC.has(make)) return "exotic";
+  if (has(full, PICKUP_M)) return "pickup";
+  if (has(full, SUV_L)) return "suv_large";
+  if (has(full, SUV_C)) return "suv_compact";
+  if (PREMIUM_GERMAN.has(make)) {
+    if ([" m3"," m4"," m5"," m8","amg"," rs"," s3"," s4"," s5"," s6"," s8"].some(b => full.includes(b))) return "premium_german_high";
+    return "premium_german";
+  }
+  if (PREMIUM_OTHER.has(make)) return "premium_other";
+  if (has(full, CITY_M)) return "city";
+  if (has(full, COMPACT_M)) return "compact_mainstream";
+  return "sedan_mainstream";
+}
+function velocityLabel(median) {
+  if (median <= 25) return [1, "Muy rápida"];
+  if (median <= 35) return [2, "Rápida"];
+  if (median <= 50) return [3, "Normal"];
+  if (median <= 75) return [4, "Lenta"];
+  return [5, "Muy lenta"];
+}
+
+// Random gen (Box-Muller)
+let _gaussSpare = null;
+function gauss() {
+  if (_gaussSpare !== null) { const s = _gaussSpare; _gaussSpare = null; return s; }
+  let u, v, s;
+  do { u = Math.random()*2-1; v = Math.random()*2-1; s = u*u+v*v; } while (s >= 1 || s === 0);
+  s = Math.sqrt(-2 * Math.log(s) / s);
+  _gaussSpare = v * s;
+  return u * s;
+}
+function lognormalSample(mu, sigma) { return Math.exp(mu + sigma * gauss()); }
+
+function estimateRotation(v, overrideDays) {
+  const seg = classifySegment(v);
+  const median = overrideDays ?? SEGMENT_DAYS[seg];
+  const N = 5000;
+  const samples = new Array(N);
+  for (let i=0; i<N; i++) samples[i] = lognormalSample(Math.log(median), 0.4);
+  const p25 = percentile(samples, 25), p50 = percentile(samples, 50);
+  const p75 = percentile(samples, 75), p90 = percentile(samples, 90);
+  const [score, label] = velocityLabel(p50);
+  const notes = [`Segmento: ${seg} (mediana ${median}d).`];
+  if (v.km > 200000) notes.push("Km muy alto: rotación más lenta probable.");
+  return {segment:seg, median_days:p50, mean_days:meanA(samples), p25_days:p25, p75_days:p75, p90_days:p90,
+    velocity_score:score, velocity_label:label,
+    prob_sell_within_30d:samples.filter(x => x<=30).length/N,
+    prob_sell_within_60d:samples.filter(x => x<=60).length/N,
+    prob_sell_within_90d:samples.filter(x => x<=90).length/N,
+    notes};
+}
+
+// ──── Risk score ────
+function computeRisk(v, origin, expectedDays, hasMarketSample) {
+  const f = {};
+  const notes = [];
+  const age = TODAY_YEAR - v.year;
+  if (origin === "extra_eu") { f.homologation = 25; notes.push("Origen extra-UE: homologación individual."); }
+  else if (!v.has_coc) f.homologation = 8;
+  else f.homologation = 0;
+  if (v.km < 30000 && age > 5) { f.mileage_rollback = 20; notes.push("Km muy bajo para edad: sospecha rollback."); }
+  else if (v.km < 50000 && age > 7) f.mileage_rollback = 10;
+  else f.mileage_rollback = 0;
+  const dd = (v.declared_damages || "").toLowerCase();
+  if (dd.includes("estructur")) { f.structural_damage = 35; notes.push("Daño estructural declarado."); }
+  else if (dd.includes("siniestr") || dd.includes("accident")) f.structural_damage = 18;
+  else if (dd && !dd.includes("cosmétic") && !dd.includes("sin")) f.structural_damage = 6;
+  else f.structural_damage = 0;
+  const po = v.previous_owners || 0;
+  f.many_owners = po >= 5 ? 12 : po >= 4 ? 6 : 0;
+  f.no_service_book = v.has_service_book ? 0 : 8;
+  f.low_liquidity = expectedDays >= 90 ? 12 : expectedDays >= 60 ? 6 : 0;
+  f.insufficient_market_data = hasMarketSample ? 0 : 15;
+  if (!hasMarketSample) notes.push("Sin comparables suficientes.");
+  f.age_mileage = (age >= 12 && v.km > 200000) ? 10 : 0;
+  const score = Math.min(100, Object.values(f).reduce((a,b)=>a+b, 0));
+  const label = score >= 60 ? "Crítico" : score >= 35 ? "Alto" : score >= 15 ? "Medio" : "Bajo";
+  return {score, label, factors:f, notes};
+}
+
+// ──── Scorer ────
+const PREMIUM_BRANDS = new Set(["bmw","mercedes-benz","mercedes","audi","porsche","lexus",
+  "land rover","range rover","jaguar","volvo","tesla","maserati","bentley","ferrari",
+  "lamborghini","aston martin"]);
+const isPremium = (v) => PREMIUM_BRANDS.has(v.make.toLowerCase());
+
+function buildScenario(name, label, sale, days, fixedNoCapital, capEmployed, capCostAnn, taxRate, discount=0.08) {
+  const capCost = capEmployed * capCostAnn * (days/365);
+  const total = fixedNoCapital + capCost;
+  const margin = sale - total;
+  const pct = total > 0 ? margin/total : 0;
+  const annualized = (capEmployed > 0 && days > 0) ? (margin/capEmployed) * (365/days) : 0;
+  const factor = 1 / Math.pow(1 + discount, days/365);
+  const npv = sale*factor - fixedNoCapital - capCost;
+  const afterTax = margin > 0 ? margin*(1-taxRate) : margin;
+  return {name, label, sale_price_eur:sale, days_to_sell:days, margin_eur:margin,
+    margin_pct:pct, margin_after_tax_eur:afterTax, annualized_roi_pct:annualized, npv_eur:npv};
+}
+
+function analyze(req) {
+  const v = {...req.vehicle};
+  const flags = [];
+  const notes = [];
+  const age = TODAY_YEAR - v.year;
+  if (v.km < 30000 && age > 5) flags.push("Sospecha rollback: <30k km con >5 años.");
+  if (v.previous_owners > 4) flags.push(`${v.previous_owners} propietarios anteriores.`);
+  if ((v.declared_damages||"").toLowerCase().includes("estructur")) flags.push("Daños estructurales declarados.");
+  if (!v.has_service_book) flags.push("Sin libro de mantenimiento.");
+
+  // 1. Adquisición EUR
+  const purchase = toEur(req.purchase_price, req.purchase_currency || "EUR",
+    req.fx_rate_to_eur !== 1 ? req.fx_rate_to_eur : null);
+  let auctionFees = 0;
+  if (req.origin === "eu_auction")
+    auctionFees = (purchase * (req.auction_fee_pct||0.055) + (req.auction_flat_fee||150)) * 1.21;
+  const cost = {purchase, auction_fees:auctionFees, transport:0, customs:0, iedmt:0,
+    homologation:0, reconditioning:0, capital_cost:0, operational:0,
+    homologation_risk_provision:0, total:0};
+
+  // 2. Transporte
+  let transportDetail;
+  if (req.transport_eur != null) {
+    cost.transport = req.transport_eur;
+    transportDetail = {override:req.transport_eur};
+  } else if (req.origin === "extra_eu") {
+    const e = estimateExtraEu(v.origin_country, false, purchase);
+    cost.transport = e.cost; transportDetail = e;
+  } else {
+    const e = estimateEuTruck(v.origin_country);
+    cost.transport = e.cost; transportDetail = e;
+  }
+
+  // 3. Aduanas
+  let customsDetail = null;
+  if (req.origin === "extra_eu") {
+    const cb = computeCustoms(purchase, cost.transport*0.7, purchase*0.015, {
+      canary:req.canary_islands, historic:age >= 30
+    });
+    cost.customs = cb.total;
+    customsDetail = cb;
+  }
+
+  // 4. IEDMT
+  const fiscalValue = (purchase * 1.25) / Math.max(0.10, depreciationCoef(age));
+  const iedmt = computeIedmt(v, fiscalValue, {canary:req.canary_islands, historic:age >= 30});
+  cost.iedmt = iedmt.tax;
+
+  // 5. Homologación
+  const isUs = v.origin_country === "US";
+  const hom = estimateHomologation(v.origin_country, v.has_coc, purchase, isPremium(v), isUs);
+  cost.homologation = hom.total;
+  cost.homologation_risk_provision = hom.riskProvision;
+
+  // 6. Reacondicionado
+  let recondDetail;
+  if (req.reconditioning_eur != null) {
+    cost.reconditioning = req.reconditioning_eur;
+    recondDetail = {override:req.reconditioning_eur};
+  } else {
+    const rc = estimateReconditioning(v, isPremium(v));
+    cost.reconditioning = rc.total;
+    recondDetail = rc;
+  }
+
+  // 7. Comparables
+  const statsEs = marketStats(req.comparables||[], v, "ES");
+  const statsDe = marketStats(req.comparables||[], v, "DE");
+  let expectedSale;
+  if (statsEs == null) {
+    notes.push("Muestra ES <5: veredicto sin solidez estadística.");
+    expectedSale = purchase * 1.25;
+  } else expectedSale = statsEs.fair;
+
+  // 8. Rotación
+  const rot = estimateRotation(v, req.days_in_stock || null);
+
+  // 9. Operativos + capital
+  cost.operational = expectedSale * 0.025 + 30;
+  let fixedNoCapital = cost.purchase + cost.auction_fees + cost.transport + cost.customs +
+    cost.iedmt + cost.homologation + cost.reconditioning + cost.operational +
+    cost.homologation_risk_provision;
+  const capEmployed = fixedNoCapital;
+  cost.capital_cost = capEmployed * (req.capital_cost_annual||0.08) * (rot.median_days/365);
+  cost.total = fixedNoCapital + cost.capital_cost;
+
+  // 10. IVA
+  let vat, netRevenue;
+  if (req.vat_regime === "rebu") {
+    vat = rebuVat(expectedSale, cost.total);
+    netRevenue = expectedSale - vat.netVatToPay;
+  } else if (req.vat_regime === "general") {
+    const saleNet = expectedSale / 1.21;
+    const ded = (cost.transport + cost.reconditioning + cost.operational) * 0.21/1.21;
+    vat = generalVat(saleNet, ded);
+    netRevenue = saleNet;
+    cost.total -= ded;
+    fixedNoCapital -= ded;
+  } else {
+    const saleNet = expectedSale / 1.21;
+    const vatImp = customsDetail ? customsDetail.vat : 0;
+    vat = generalVat(saleNet, vatImp);
+    cost.total -= vatImp;
+    fixedNoCapital -= vatImp;
+    netRevenue = saleNet;
+  }
+
+  // 11. Escenarios
+  let recPrice, quickPrice, patientPrice;
+  if (statsEs) {
+    recPrice = statsEs.fair;
+    quickPrice = Math.min(statsEs.p25 * 1.05, recPrice * 0.96);
+    patientPrice = Math.max(statsEs.p75, recPrice * 1.04);
+  } else {
+    recPrice = expectedSale;
+    quickPrice = expectedSale * 0.93;
+    patientPrice = expectedSale * 1.07;
+  }
+  const scenarios = [
+    buildScenario("quick", "Venta rápida (P25×1.05)", quickPrice, Math.max(15, rot.p25_days*0.85),
+      fixedNoCapital, capEmployed, req.capital_cost_annual||0.08, req.income_tax_rate||0.25),
+    buildScenario("recommended", "Recomendada (precio justo)", recPrice, rot.median_days,
+      fixedNoCapital, capEmployed, req.capital_cost_annual||0.08, req.income_tax_rate||0.25),
+    buildScenario("patient", "Paciente (P75)", patientPrice, rot.p75_days,
+      fixedNoCapital, capEmployed, req.capital_cost_annual||0.08, req.income_tax_rate||0.25),
+  ];
+  const rec = scenarios[1];
+
+  const margin = netRevenue - cost.total;
+  const pct = cost.total > 0 ? margin/cost.total : 0;
+  const afterTax = margin > 0 ? margin*(1-(req.income_tax_rate||0.25)) : margin;
+
+  // 12. Monte Carlo
+  const N = 1000;
+  const sigmaP = statsEs ? statsEs.std : expectedSale*0.08;
+  const margins = new Array(N);
+  let days_arr = new Array(N);
+  for (let i=0; i<N; i++) {
+    let s = expectedSale + sigmaP * gauss();
+    if (statsEs) s = Math.max(statsEs.p25*0.95, Math.min(statsEs.p75*1.15, s));
+    const d = lognormalSample(Math.log(rot.median_days), 0.4);
+    days_arr[i] = d;
+    const cc = capEmployed * (req.capital_cost_annual||0.08) * (d/365);
+    margins[i] = s - fixedNoCapital - cc;
+  }
+  const mc = {
+    n:N, expected_margin_eur:meanA(margins), std_margin_eur:stdA(margins),
+    p5_margin_eur:percentile(margins, 5), p50_margin_eur:percentile(margins, 50),
+    p95_margin_eur:percentile(margins, 95),
+    prob_loss:margins.filter(x => x<0).length/N,
+    prob_margin_above_1500:margins.filter(x => x>=1500).length/N,
+    prob_margin_above_3000:margins.filter(x => x>=3000).length/N,
+    var95_eur:percentile(margins, 5),
+    expected_days_to_sell:meanA(days_arr),
+    p90_days_to_sell:percentile(days_arr, 90),
+  };
+
+  // 13. Puja máxima
+  const floorSale = statsEs ? statsEs.p25 : expectedSale*0.92;
+  const targetTotal = floorSale / (1 + (req.target_margin_pct||0.12));
+  const fixedNoPurch = cost.total - cost.purchase - cost.auction_fees;
+  const aFactor = 1 + (req.auction_fee_pct||0.055)*1.21;
+  const maxBid = Math.max(0, (targetTotal - fixedNoPurch - (req.auction_flat_fee||150)*1.21) / aFactor);
+
+  // 14. Risk
+  const risk = computeRisk(v, req.origin, rot.median_days, statsEs != null);
+
+  // 15. Veredicto
+  let label;
+  if (flags.some(f => f.toLowerCase().includes("estructur"))) label = "⚫ VETO";
+  else if (risk.score >= 60) label = "⚫ VETO (riesgo crítico)";
+  else if (req.origin === "extra_eu" && !v.euro_norm) {
+    label = "🟡 AMARILLO (Euro no verificada)";
+    flags.push("Verificar Euro 6d antes de comprar (extra-UE).");
+  } else if (pct >= 0.12 && margin >= 1500 && risk.score < 35) label = "🟢 VERDE";
+  else if (pct >= 0.06 && risk.score < 50) label = "🟡 AMARILLO";
+  else label = "🔴 ROJO";
+
+  const summary = {
+    vehicle:`${v.make} ${v.model} ${v.version||""} ${v.year} · ${v.km.toLocaleString()} km`.replace(/\s+/g," ").trim(),
+    verdict:label, recommended_sale_eur:rec.sale_price_eur,
+    expected_margin_eur:rec.margin_eur, expected_days_to_sell:rec.days_to_sell,
+    annualized_roi_pct:rec.annualized_roi_pct, max_bid_eur:maxBid,
+    risk_score:risk.score, risk_label:risk.label, velocity:rot.velocity_label,
+  };
+
+  return {label, margin_eur:margin, margin_pct:pct, margin_after_tax_eur:afterTax,
+    expected_sale_eur:expectedSale, cost_total_eur:cost.total, cost_breakdown:cost,
+    market_stats_es:statsEs, market_stats_de:statsDe, monte_carlo:mc, max_bid_eur:maxBid,
+    flags, notes, iedmt_detail:iedmt, customs_detail:customsDetail, vat_detail:vat,
+    reconditioning_detail:recondDetail, homologation_detail:hom,
+    transport_detail:transportDetail, rotation:rot, risk, scenarios,
+    annualized_roi_pct:rec.annualized_roi_pct, recommended_sale_eur:rec.sale_price_eur,
+    summary};
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  SELF-TESTS (consola)
+// ════════════════════════════════════════════════════════════════════
+function selfTest() {
+  console.assert(iedmtRate(100) === 0, "IEDMT <120 = 0");
+  console.assert(iedmtRate(140) === 0.0475, "IEDMT 120-159");
+  console.assert(iedmtRate(180) === 0.0975, "IEDMT 160-199");
+  console.assert(iedmtRate(210) === 0.1475, "IEDMT >=200");
+  console.assert(iedmtRate(140, true) === 0.0375, "Canarias");
+  console.assert(depreciationCoef(50) === 0.10, "Floor");
+
+  const r = rebuVat(20000, 15000);
+  console.assert(Math.abs(r.vatCharged - 867.768) < 1, "REBU vat ~868");
+  const r0 = rebuVat(10000, 12000);
+  console.assert(r0.vatCharged === 0, "REBU margen negativo");
+
+  const cb = computeCustoms(30000, 2000, 450);
+  console.assert(Math.abs(cb.cif - 32450) < 1, "CIF Dubai");
+  console.assert(Math.abs(cb.duty - 3245) < 1, "Duty 10%");
+
+  console.log("✓ Self-tests OK");
+}
+selfTest();
+
+// ════════════════════════════════════════════════════════════════════
+//  REACT UI
+// ════════════════════════════════════════════════════════════════════
+const FUELS = [["gasoline","Gasolina"],["diesel","Diésel"],["hev","HEV"],["mhev","MHEV"],
+  ["phev","PHEV"],["bev","BEV (eléctrico)"],["lpg","GLP"],["cng","GNC"]];
+const ORIGINS = [["eu_auction","Subasta UE (OpenLane/BCA)"],["eu_retail_pro","Retail UE pro"],
+  ["eu_retail_pro_rebu","Retail UE pro REBU"],["eu_retail_private","Retail UE particular"],
+  ["extra_eu","Extra-UE (Dubái/JP/US/UK)"]];
+const VAT = [["rebu","REBU"],["general","General 21%"],["import_extra_eu","Importación extra-UE"]];
+
+function App() {
+  const [tab, setTab] = useState("vehicle");
+  const [verdict, setVerdict] = useState(null);
+  const [error, setError] = useState(null);
+  const [v, setV] = useState({make:"BMW", model:"Serie 3", version:"320d", year:2020, km:95000,
+    fuel:"diesel", power_cv:190, co2_wltp:145, euro_norm:"6d", origin_country:"DE",
+    has_coc:true, has_service_book:true, previous_owners:2, declared_damages:""});
+  const [req, setReq] = useState({origin:"eu_auction", purchase_price:14500,
+    purchase_currency:"EUR", fx_rate_to_eur:1, auction_fee_pct:0.055, auction_flat_fee:150,
+    target_margin_pct:0.12, vat_regime:"rebu", canary_islands:false, days_in_stock:0,
+    capital_cost_annual:0.08, income_tax_rate:0.25});
+  const [comps, setComps] = useState([
+    {source:"coches.net", market:"ES", price_eur:22500, km:88000, year:2020},
+    {source:"coches.net", market:"ES", price_eur:21000, km:105000, year:2020},
+    {source:"coches.net", market:"ES", price_eur:23500, km:75000, year:2021},
+    {source:"autoscout24.es", market:"ES", price_eur:22000, km:92000, year:2020},
+    {source:"autoscout24.es", market:"ES", price_eur:24000, km:70000, year:2021},
+    {source:"mobile.de", market:"DE", price_eur:19500, km:88000, year:2020},
+    {source:"mobile.de", market:"DE", price_eur:18900, km:96000, year:2020},
+  ]);
+
+  const upd = (s, k) => (e) => {
+    const val = e.target.type === "checkbox" ? e.target.checked
+      : e.target.type === "number" ? Number(e.target.value)
+      : e.target.value;
+    s(p => ({...p, [k]:val}));
+  };
+
+  const doAnalyze = () => {
+    setError(null);
+    try {
+      const r = analyze({...req, vehicle:v, comparables:comps});
+      setVerdict(r);
+      setTab("verdict");
+    } catch (e) {
+      console.error(e);
+      setError(String(e));
+    }
+  };
+
+  const doExport = () => {
+    if (!verdict) return;
+    const data = {request:{...req, vehicle:v, comparables:comps}, verdict};
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `analysis-${v.make}-${v.model}-${Date.now()}.json`;
+    a.click(); URL.revokeObjectURL(url);
+  };
+
+  const doShare = async () => {
+    if (!verdict) return;
+    const s = verdict.summary;
+    const txt = `${s.verdict} ${s.vehicle}\n` +
+      `Venta recomendada: ${fmtEur(s.recommended_sale_eur)}\n` +
+      `Margen: ${fmtEur(s.expected_margin_eur)} (${fmtPct(s.annualized_roi_pct)} ROI an.)\n` +
+      `Días: ${round0(s.expected_days_to_sell)} (${s.velocity})\n` +
+      `Puja máx: ${fmtEur(s.max_bid_eur)}\n` +
+      `Riesgo: ${s.risk_label} (${s.risk_score}/100)`;
+    if (navigator.share) {
+      try { await navigator.share({title:"Car Arbitrage", text:txt}); return; } catch {}
+    }
+    navigator.clipboard.writeText(txt);
+    alert("Resumen copiado al portapapeles.");
+  };
+
+  const T = ({id, children}) => (
+    <button onClick={() => setTab(id)} className={"px-3 py-2 rounded-t-lg text-sm font-medium whitespace-nowrap " +
+      (tab===id ? "bg-white border-b-2 border-blue-600 text-blue-700" : "text-slate-500")}>{children}</button>
+  );
+  const F = ({label, children, hint}) => (
+    <label className="block text-sm">
+      <span className="text-slate-600">{label}</span>{children}
+      {hint && <span className="block text-xs text-slate-400 mt-0.5">{hint}</span>}
+    </label>
+  );
+  const I = (p) => <input {...p} className="mt-1 w-full rounded border-slate-300 border px-2 py-1.5 num focus:ring-2 focus:ring-blue-500 outline-none"/>;
+  const S = ({children, ...p}) => <select {...p} className="mt-1 w-full rounded border-slate-300 border px-2 py-1.5 bg-white">{children}</select>;
+
+  return (
+    <div className="max-w-6xl mx-auto p-3 sm:p-4 pb-24">
+      <header className="mb-4">
+        <h1 className="text-2xl sm:text-3xl font-bold">🚗 Car Arbitrage Pro</h1>
+        <p className="text-xs sm:text-sm text-slate-500">IEDMT · IVA/REBU · Aduanas extra-UE · Comparables · Monte Carlo · 100% offline</p>
+      </header>
+      <div className="border-b border-slate-200 mb-4 flex gap-1 overflow-x-auto">
+        <T id="vehicle">1. Vehículo</T>
+        <T id="purchase">2. Compra</T>
+        <T id="market">3. Mercado</T>
+        <T id="verdict">4. Veredicto</T>
+      </div>
+
+      {tab === "vehicle" && (
+        <div className="bg-white p-4 rounded-lg shadow-sm grid grid-cols-2 md:grid-cols-3 gap-3">
+          <F label="Marca"><I value={v.make} onChange={upd(setV,"make")}/></F>
+          <F label="Modelo"><I value={v.model} onChange={upd(setV,"model")}/></F>
+          <F label="Versión"><I value={v.version||""} onChange={upd(setV,"version")}/></F>
+          <F label="Año"><I type="number" value={v.year} onChange={upd(setV,"year")}/></F>
+          <F label="Km"><I type="number" value={v.km} onChange={upd(setV,"km")}/></F>
+          <F label="Combustible"><S value={v.fuel} onChange={upd(setV,"fuel")}>{FUELS.map(([id,l]) => <option key={id} value={id}>{l}</option>)}</S></F>
+          <F label="CV"><I type="number" value={v.power_cv||""} onChange={upd(setV,"power_cv")}/></F>
+          <F label="CO₂ WLTP" hint="Clave para IEDMT"><I type="number" value={v.co2_wltp||""} onChange={upd(setV,"co2_wltp")}/></F>
+          <F label="Norma Euro"><I value={v.euro_norm||""} onChange={upd(setV,"euro_norm")}/></F>
+          <F label="País origen (ISO-2)"><I value={v.origin_country} onChange={upd(setV,"origin_country")} placeholder="DE / FR / AE..."/></F>
+          <F label="Propietarios"><I type="number" value={v.previous_owners||0} onChange={upd(setV,"previous_owners")}/></F>
+          <F label="Daños declarados"><I value={v.declared_damages||""} onChange={upd(setV,"declared_damages")}/></F>
+          <label className="flex items-center gap-2 mt-6"><input type="checkbox" checked={v.has_coc} onChange={upd(setV,"has_coc")}/><span className="text-sm">Tiene COC</span></label>
+          <label className="flex items-center gap-2 mt-6"><input type="checkbox" checked={v.has_service_book} onChange={upd(setV,"has_service_book")}/><span className="text-sm">Libro mantenimiento</span></label>
+        </div>
+      )}
+
+      {tab === "purchase" && (
+        <div className="bg-white p-4 rounded-lg shadow-sm grid grid-cols-2 md:grid-cols-3 gap-3">
+          <F label="Origen / canal"><S value={req.origin} onChange={upd(setReq,"origin")}>{ORIGINS.map(([id,l]) => <option key={id} value={id}>{l}</option>)}</S></F>
+          <F label="Régimen IVA"><S value={req.vat_regime} onChange={upd(setReq,"vat_regime")}>{VAT.map(([id,l]) => <option key={id} value={id}>{l}</option>)}</S></F>
+          <F label="Canarias">
+            <S value={req.canary_islands} onChange={(e)=>setReq(s=>({...s, canary_islands:e.target.value==="true"}))}>
+              <option value="false">No</option><option value="true">Sí (IGIC 7%)</option>
+            </S>
+          </F>
+          <F label="Precio adjudicación"><I type="number" value={req.purchase_price} onChange={upd(setReq,"purchase_price")}/></F>
+          <F label="Moneda"><S value={req.purchase_currency} onChange={upd(setReq,"purchase_currency")}>
+            <option>EUR</option><option>USD</option><option>AED</option><option>GBP</option><option>JPY</option>
+          </S></F>
+          <F label="FX a EUR" hint="1 = default"><I type="number" step="0.0001" value={req.fx_rate_to_eur} onChange={upd(setReq,"fx_rate_to_eur")}/></F>
+          <F label="Comisión subasta %"><I type="number" step="0.001" value={req.auction_fee_pct} onChange={upd(setReq,"auction_fee_pct")}/></F>
+          <F label="Fee fijo (€)"><I type="number" value={req.auction_flat_fee} onChange={upd(setReq,"auction_flat_fee")}/></F>
+          <F label="Margen objetivo %"><I type="number" step="0.01" value={req.target_margin_pct} onChange={upd(setReq,"target_margin_pct")}/></F>
+          <F label="Días stock override" hint="0 = auto por segmento"><I type="number" value={req.days_in_stock} onChange={upd(setReq,"days_in_stock")}/></F>
+          <F label="Coste capital anual"><I type="number" step="0.01" value={req.capital_cost_annual} onChange={upd(setReq,"capital_cost_annual")}/></F>
+          <F label="Tipo IRPF/IS"><I type="number" step="0.01" value={req.income_tax_rate} onChange={upd(setReq,"income_tax_rate")}/></F>
+        </div>
+      )}
+
+      {tab === "market" && (
+        <div className="bg-white p-4 rounded-lg shadow-sm">
+          <h3 className="font-semibold mb-2">Comparables ({comps.length})</h3>
+          <p className="text-xs text-slate-500 mb-3">Mín 5 ES recomendado para veredicto sólido. Edita o pega.</p>
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-left text-slate-500"><tr><th>Fuente</th><th>Mer</th><th>€</th><th>Km</th><th>Año</th><th></th></tr></thead>
+            <tbody>
+              {comps.map((c,i) => (
+                <tr key={i} className="border-t">
+                  <td><input className="w-28 px-1 py-1" value={c.source} onChange={(e)=>setComps(cs=>cs.map((x,j)=>j===i?{...x, source:e.target.value}:x))}/></td>
+                  <td><select className="px-1 py-1" value={c.market} onChange={(e)=>setComps(cs=>cs.map((x,j)=>j===i?{...x, market:e.target.value}:x))}>
+                    <option>ES</option><option>DE</option><option>FR</option><option>IT</option><option>AE</option><option>UK</option>
+                  </select></td>
+                  <td><input type="number" className="w-20 px-1 py-1 num" value={c.price_eur} onChange={(e)=>setComps(cs=>cs.map((x,j)=>j===i?{...x, price_eur:Number(e.target.value)}:x))}/></td>
+                  <td><input type="number" className="w-20 px-1 py-1 num" value={c.km} onChange={(e)=>setComps(cs=>cs.map((x,j)=>j===i?{...x, km:Number(e.target.value)}:x))}/></td>
+                  <td><input type="number" className="w-16 px-1 py-1 num" value={c.year} onChange={(e)=>setComps(cs=>cs.map((x,j)=>j===i?{...x, year:Number(e.target.value)}:x))}/></td>
+                  <td><button onClick={()=>setComps(cs=>cs.filter((_,j)=>j!==i))} className="text-red-600 px-2">×</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          </div>
+          <button onClick={()=>setComps(cs=>[...cs, {source:"manual", market:"ES", price_eur:0, km:0, year:TODAY_YEAR-2}])}
+            className="mt-3 px-3 py-1.5 bg-slate-100 rounded text-sm">+ Añadir</button>
+        </div>
+      )}
+
+      {tab === "verdict" && (
+        <div className="bg-white p-4 rounded-lg shadow-sm">
+          {!verdict && <p className="text-slate-500">Pulsa "Analizar" abajo.</p>}
+          {error && <pre className="text-red-600 text-xs whitespace-pre-wrap">{error}</pre>}
+          {verdict && <V v={verdict}/>}
+        </div>
+      )}
+
+      {/* Sticky bottom bar */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-3 flex items-center gap-2 flex-wrap shadow-lg">
+        <button onClick={doAnalyze} className="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium flex-1 sm:flex-none min-w-32">Analizar</button>
+        {verdict && <>
+          <button onClick={doShare} className="px-3 py-2.5 bg-slate-200 rounded-lg text-sm">📤</button>
+          <button onClick={doExport} className="px-3 py-2.5 bg-slate-200 rounded-lg text-sm">⬇ JSON</button>
+          <span className={"text-xl font-bold " + verdictColor(verdict.label)}>{verdict.label}</span>
+        </>}
+      </div>
+    </div>
+  );
+}
+
+function verdictColor(l) {
+  if (!l) return "";
+  if (l.startsWith("🟢")) return "text-green-600";
+  if (l.startsWith("🟡")) return "text-amber-600";
+  if (l.startsWith("🔴")) return "text-red-600";
+  return "text-slate-700";
+}
+
+function V({v}) {
+  const cb = v.cost_breakdown || {};
+  const rot = v.rotation || {};
+  const risk = v.risk || {};
+  const sc = v.scenarios || [];
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+        <St label="Venta recom." value={fmtEur(v.recommended_sale_eur)} accent/>
+        <St label="Margen" value={fmtEur(v.margin_eur)} accent/>
+        <St label="Margen %" value={fmtPct(v.margin_pct)}/>
+        <St label="ROI an." value={fmtPct(v.annualized_roi_pct)} accent/>
+        <St label="Días vender" value={`${round0(rot.median_days)}d`}/>
+        <St label="Velocidad" value={rot.velocity_label||"—"}/>
+        <St label="Riesgo" value={`${risk.label||"—"} (${risk.score||0})`}/>
+        <St label="Puja máx" value={fmtEur(v.max_bid_eur)} accent/>
+        <St label="Coste total" value={fmtEur(v.cost_total_eur)}/>
+        <St label="Margen post-IRPF" value={fmtEur(v.margin_after_tax_eur)}/>
+        <St label="Prob. pérdida" value={fmtPct(v.monte_carlo?.prob_loss)}/>
+        <St label="VaR 95%" value={fmtEur(v.monte_carlo?.var95_eur)}/>
+      </div>
+
+      {sc.length > 0 && (
+        <div>
+          <h3 className="font-semibold mb-2">Escenarios de venta</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {sc.map((s,i) => (
+              <div key={i} className={"rounded-lg p-3 border " + (s.name==="recommended" ? "border-blue-300 bg-blue-50" : "border-slate-200 bg-white")}>
+                <div className="text-xs uppercase text-slate-500">{s.name}</div>
+                <div className="font-semibold text-sm">{s.label}</div>
+                <div className="mt-2 num text-xl font-bold">{fmtEur(s.sale_price_eur)}</div>
+                <div className="text-xs mt-2 grid grid-cols-2 gap-x-2">
+                  <span className="text-slate-500">Días:</span><span className="text-right num">{round0(s.days_to_sell)}</span>
+                  <span className="text-slate-500">Margen:</span><span className="text-right num font-medium">{fmtEur(s.margin_eur)}</span>
+                  <span className="text-slate-500">ROI an.:</span><span className="text-right num font-medium">{fmtPct(s.annualized_roi_pct)}</span>
+                  <span className="text-slate-500">NPV:</span><span className="text-right num">{fmtEur(s.npv_eur)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {v.flags?.length > 0 && (
+        <div className="bg-amber-50 border-l-4 border-amber-500 p-3 text-sm">
+          <strong>Avisos:</strong>
+          <ul className="list-disc ml-5">{v.flags.map((f,i) => <li key={i}>{f}</li>)}</ul>
+        </div>
+      )}
+
+      <details><summary className="font-semibold">Risk score · {risk.label} ({risk.score}/100)</summary>
+        <table className="w-full text-sm mt-2"><tbody>
+          {Object.entries(risk.factors || {}).map(([k,val]) => <tr key={k} className="border-t"><td>{k}</td><td className="text-right num">{val}</td></tr>)}
+        </tbody></table>
+        {risk.notes?.length > 0 && <ul className="mt-2 text-xs text-slate-600 list-disc ml-5">{risk.notes.map((n,i) => <li key={i}>{n}</li>)}</ul>}
+      </details>
+
+      <details><summary className="font-semibold">Rotación: {rot.segment}</summary>
+        <div className="text-sm mt-2 grid grid-cols-2 gap-2">
+          <div>Mediana: {round0(rot.median_days)}d</div>
+          <div>P25/P75/P90: {round0(rot.p25_days)}/{round0(rot.p75_days)}/{round0(rot.p90_days)}d</div>
+          <div>Prob &lt;30d: {fmtPct(rot.prob_sell_within_30d)}</div>
+          <div>Prob &lt;60d: {fmtPct(rot.prob_sell_within_60d)}</div>
+          <div>Prob &lt;90d: {fmtPct(rot.prob_sell_within_90d)}</div>
+        </div>
+      </details>
+
+      <details open><summary className="font-semibold">Desglose de costes</summary>
+        <table className="w-full text-sm mt-2"><tbody>
+          <Row k="Adquisición" v={cb.purchase}/>
+          <Row k="Comisión subasta" v={cb.auction_fees}/>
+          <Row k="Transporte" v={cb.transport}/>
+          <Row k="Aduanas" v={cb.customs}/>
+          <Row k="IEDMT" v={cb.iedmt}/>
+          <Row k="Homologación" v={cb.homologation}/>
+          <Row k="Reacondicionado" v={cb.reconditioning}/>
+          <Row k="Coste capital" v={cb.capital_cost}/>
+          <Row k="Operativos" v={cb.operational}/>
+          <Row k="Provisión riesgo extra-UE" v={cb.homologation_risk_provision}/>
+          <Row k="TOTAL" v={cb.total} bold/>
+        </tbody></table>
+      </details>
+
+      <details><summary className="font-semibold">IEDMT</summary>
+        <pre className="text-xs bg-slate-50 p-2 rounded overflow-x-auto">{JSON.stringify(v.iedmt_detail, null, 2)}</pre>
+      </details>
+      {v.customs_detail && <details><summary className="font-semibold">Aduanas</summary>
+        <pre className="text-xs bg-slate-50 p-2 rounded overflow-x-auto">{JSON.stringify(v.customs_detail, null, 2)}</pre>
+      </details>}
+      <details><summary className="font-semibold">IVA</summary>
+        <pre className="text-xs bg-slate-50 p-2 rounded overflow-x-auto">{JSON.stringify(v.vat_detail, null, 2)}</pre>
+      </details>
+      <details><summary className="font-semibold">Mercado ES / DE</summary>
+        <div className="grid md:grid-cols-2 gap-4 mt-2 text-xs">
+          <div><strong>ES:</strong><pre className="bg-slate-50 p-2 rounded overflow-x-auto">{JSON.stringify(v.market_stats_es, null, 2)}</pre></div>
+          <div><strong>DE:</strong><pre className="bg-slate-50 p-2 rounded overflow-x-auto">{JSON.stringify(v.market_stats_de, null, 2)}</pre></div>
+        </div>
+      </details>
+      <details><summary className="font-semibold">Monte Carlo (1000 sims)</summary>
+        <pre className="text-xs bg-slate-50 p-2 rounded">{JSON.stringify(v.monte_carlo, null, 2)}</pre>
+      </details>
+    </div>
+  );
+}
+
+function St({label, value, accent}) {
+  return (
+    <div className={"rounded p-2 " + (accent ? "bg-blue-50 border border-blue-200" : "bg-slate-50")}>
+      <div className="text-xs text-slate-500">{label}</div>
+      <div className="text-sm sm:text-base font-semibold num">{value}</div>
+    </div>
+  );
+}
+function Row({k, v, bold}) {
+  return <tr className={"border-t " + (bold ? "font-semibold" : "")}>
+    <td className="py-1">{k}</td><td className="py-1 text-right num">{fmtEur(v)}</td>
+  </tr>;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
