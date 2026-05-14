@@ -387,6 +387,25 @@ class CustomerSubscriptionDB(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class ContactMessageDB(Base):
+    """Mensajes inbound/outbound multi-canal (WA Cloud, Twilio SMS/WA, webform).
+
+    Cubre todo el contacto entrante hacia +34 650 76 74 01 (TRESAAA satélite).
+    Persistencia obligatoria — los dispatchers de auto-respuesta y la notificación
+    a Telegram solo corren después de commit. Ver backend/contact.py.
+    """
+    __tablename__ = "contact_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    from_addr = Column(String(255), nullable=False, index=True)
+    channel = Column(String(32), nullable=False, index=True)
+    text = Column(String(8000), nullable=False)
+    intent = Column(String(32), nullable=True, index=True)
+    response_sent = Column(Boolean, default=False, nullable=False)
+    raw_payload = Column(String(8000), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+
 class NotificationChannelDB(Base):
     """Canales de notificación por usuario (web push + Telegram + email).
 

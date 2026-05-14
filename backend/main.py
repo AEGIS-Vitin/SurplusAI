@@ -137,6 +137,9 @@ app.include_router(desperdicio_bulk.router)
 app.include_router(desperdicio_extras.router)
 app.include_router(desperdicio_growth.router)
 
+import contact  # noqa: E402  — multi-channel contact handler (+34 650 76 74 01)
+app.include_router(contact.router)
+
 
 # Dependency for database session
 def get_db():
